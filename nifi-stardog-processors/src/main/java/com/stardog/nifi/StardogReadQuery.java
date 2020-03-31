@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import com.complexible.common.base.Objects2;
 import com.complexible.common.rdf.query.SPARQLUtil;
 import com.complexible.common.rdf.query.SPARQLUtil.QueryType;
+import com.complexible.stardog.Schemas;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.GraphQuery;
 import com.complexible.stardog.api.Query;
@@ -58,6 +59,7 @@ import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.expression.ExpressionLanguageScope;
@@ -82,7 +84,7 @@ import org.apache.nifi.processor.util.StandardValidators;
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
 @SeeAlso({})
 @WritesAttributes({ @WritesAttribute(attribute = "result.count", description = "The number of rows returned by the select query") })
-public class StardogRead extends AbstractStardogProcessor {
+public class StardogReadQuery extends AbstractStardogProcessor {
 
 	public static final String RESULT_COUNT = "result.count";
 
@@ -148,10 +150,35 @@ public class StardogRead extends AbstractStardogProcessor {
 					.defaultValue(DEFAULT_FORMAT)
 					.build();
 
+
+	public static final PropertyDescriptor REASONING =
+			new PropertyDescriptor.Builder()
+					.name("Reasoning")
+					.description("Enable reasoning for the query.")
+					.required(true)
+					.defaultValue("false")
+					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+					.addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+					.build();
+
+
+	public static final PropertyDescriptor REASONING_SCHEMA =
+			new PropertyDescriptor.Builder()
+					.name("Reasoning Schema")
+					.description("Select the reasoning schema to be used if reasoning is enabled. This value takes effect " +
+					             "only if reasoning option is enabled.")
+					.required(false)
+					.addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+					.build();
+
 	private static final List<PropertyDescriptor> PROPERTIES =
 			ImmutableList.<PropertyDescriptor>builder()
 					.addAll(DEFAULT_PROPERTIES)
-					.add(QUERY).add(QUERY_TIMEOUT).add(OUTPUT_FORMAT).build();
+					.add(QUERY)
+					.add(QUERY_TIMEOUT)
+					.add(OUTPUT_FORMAT)
+					.build();
 
 	@Override
 	protected void init(final ProcessorInitializationContext context) {
@@ -198,10 +225,17 @@ public class StardogRead extends AbstractStardogProcessor {
 		FlowFile inputFile = null;
 		if (context.hasIncomingConnection()) {
 			inputFile = session.get();
-		}
 
-		if (inputFile == null) {
-			inputFile = session.create();
+			// If we have no FlowFile, and all incoming connections are self-loops then we can continue on.
+			// However, if we have no FlowFile and we have connections coming from other Processors, then
+			// we know that we should run only if we have a FlowFile.
+			if (inputFile == null) {
+				if (context.hasNonLoopConnection()) {
+					return;
+				}
+
+				inputFile = session.create();
+			}
 		}
 
 		Stopwatch stopwatch = Stopwatch.createStarted();
@@ -216,13 +250,22 @@ public class StardogRead extends AbstractStardogProcessor {
 		String selectedFormat = context.getProperty(OUTPUT_FORMAT).getValue();
 		Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
 		FileFormat outputFormat = outputFormats.get(queryType);
+		boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
+		PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA).evaluateAttributeExpressions(inputFile);
+		String schema = schemaValue.isSet()
+		                ? schemaValue.getValue()
+		                : isReasoning
+		                  ? Schemas.DEFAULT
+		                  : Schemas.NULL;
 
 		MutableLong resultCount = new MutableLong(0L);
 
 		try (Connection connection = connect(context)) {
-			Query<?> query = createQuery(connection, queryStr, queryType);
+			Query<?> query = createQuery(connection, queryStr, queryType)
+					                 .timeout(queryTimeout)
+					                 .reasoning(isReasoning)
+					                 .schema(schema);
 
-			// TODO set reasoning, dataset, parameters
 
 			outputFile = session.write(inputFile, stream -> {
 				resultCount.setValue(executeQuery(query, stream, outputFormat));

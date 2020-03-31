@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-com.stardog.nifi.StardogRead
-com.stardog.nifi.StardogLoad
-com.stardog.nifi.StardogUpdate
-com.stardog.nifi.StardogImportTable
-com.stardog.nifi.StardogImportJSON
+com.stardog.nifi.StardogReadQuery
+com.stardog.nifi.StardogUpdateQuery
+com.stardog.nifi.StardogPut

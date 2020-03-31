@@ -28,7 +28,7 @@ public class StardogProcessorTest {
 
     @Before
     public void init() {
-        testRunner = TestRunners.newTestRunner(StardogRead.class);
+        testRunner = TestRunners.newTestRunner(StardogReadQuery.class);
     }
 
     @Test
