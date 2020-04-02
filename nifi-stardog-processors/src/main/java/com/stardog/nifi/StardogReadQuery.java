@@ -140,7 +140,6 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					.addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
 					.build();
 
-
 	public static final PropertyDescriptor OUTPUT_FORMAT =
 			new PropertyDescriptor.Builder()
 					.name("Output Format")
@@ -149,7 +148,6 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					.allowableValues(OUTPUT_FORMATS.keySet())
 					.defaultValue(DEFAULT_FORMAT)
 					.build();
-
 
 	public static final PropertyDescriptor REASONING =
 			new PropertyDescriptor.Builder()
@@ -160,7 +158,6 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
 					.addValidator(StandardValidators.BOOLEAN_VALIDATOR)
 					.build();
-
 
 	public static final PropertyDescriptor REASONING_SCHEMA =
 			new PropertyDescriptor.Builder()
@@ -222,20 +219,9 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 
 	@Override
 	public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
-		FlowFile inputFile = null;
-		if (context.hasIncomingConnection()) {
-			inputFile = session.get();
-
-			// If we have no FlowFile, and all incoming connections are self-loops then we can continue on.
-			// However, if we have no FlowFile and we have connections coming from other Processors, then
-			// we know that we should run only if we have a FlowFile.
-			if (inputFile == null) {
-				if (context.hasNonLoopConnection()) {
-					return;
-				}
-
-				inputFile = session.create();
-			}
+		FlowFile inputFile = getOptionalFlowFile(context, session);
+		if (inputFile == null) {
+			return;
 		}
 
 		Stopwatch stopwatch = Stopwatch.createStarted();
@@ -284,8 +270,9 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 			Throwable rootCause = Throwables.getRootCause(t);
 			context.yield();
 			logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
-			session.rollback(true);
-			session.transfer(outputFile, REL_FAILURE);
+			if (outputFile != null) {
+				session.transfer(outputFile, REL_FAILURE);
+			}
 		}
 	}
 

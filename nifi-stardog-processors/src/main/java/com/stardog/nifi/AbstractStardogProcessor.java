@@ -17,23 +17,26 @@
 
 package com.stardog.nifi;
 
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.ConnectionConfiguration;
+import com.stardog.stark.IRI;
+import com.stardog.stark.Values;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import org.apache.logging.log4j.util.Strings;
 import org.apache.nifi.components.PropertyDescriptor;
-import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.components.Validator;
 import org.apache.nifi.expression.ExpressionLanguageScope;
+import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
+import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
 
@@ -103,4 +106,38 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
         return connection;
     }
 
+    protected static final Validator IRI_VALIDATOR = (subject, input, context) -> {
+        if(context.isExpressionLanguageSupported(subject) && context.isExpressionLanguagePresent(input)) {
+            return (new ValidationResult.Builder()).subject(subject).input(input).explanation("Expression Language Present").valid(true).build();
+        } else {
+            try {
+                Values.iri(input);
+                return (new ValidationResult.Builder()).subject(subject).input(input).explanation("Valid IRI").valid(true).build();
+            } catch (Exception var5) {
+                return (new ValidationResult.Builder()).subject(subject).input(input).explanation("Not a valid IRI").valid(false).build();
+            }
+        }
+    };
+
+    public static IRI toIRI(String iri, Connection conn, IRI defaultIRI) {
+        return Strings.isEmpty(iri)
+               ? defaultIRI
+               : Values.iri(conn.namespaces().map(iri).orElse(iri));
+    }
+
+    public static FlowFile getOptionalFlowFile(final ProcessContext context, final ProcessSession session) {
+        FlowFile inputFile = session.get();
+        // If we have no FlowFile, and all incoming connections are self-loops then we can continue on.
+        // However, if we have no FlowFile and we have connections coming from other Processors, then
+        // we know that we should run only if we have a FlowFile.
+        if (inputFile == null) {
+            if (context.hasNonLoopConnection()) {
+                return null;
+            }
+
+            inputFile = session.create();
+        }
+
+        return inputFile;
+    }
 }

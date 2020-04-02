@@ -17,39 +17,20 @@
 
 package com.stardog.nifi;
 
-import java.io.FileInputStream;
-import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import com.complexible.common.base.Objects2;
 import com.complexible.common.rdf.query.SPARQLUtil;
 import com.complexible.common.rdf.query.SPARQLUtil.QueryType;
 import com.complexible.stardog.api.Connection;
-import com.complexible.stardog.api.GraphQuery;
-import com.complexible.stardog.api.Query;
-import com.complexible.stardog.api.SelectQuery;
 import com.complexible.stardog.api.UpdateQuery;
-import com.complexible.stardog.virtual.api.VirtualGraphMappingSyntax;
-import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection;
-import com.stardog.stark.Values;
-import com.stardog.stark.io.FileFormat;
-import com.stardog.stark.io.RDFFormat;
-import com.stardog.stark.io.RDFWriter;
-import com.stardog.stark.io.RDFWriters;
-import com.stardog.stark.query.GraphQueryResult;
-import com.stardog.stark.query.SelectQueryResult;
-import com.stardog.stark.query.io.QueryResultFormat;
-import com.stardog.stark.query.io.QueryResultWriters;
-import com.stardog.stark.query.io.SelectQueryResultWriter;
 
 import com.google.api.client.util.Sets;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Files;
 import org.apache.nifi.annotation.behavior.EventDriven;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
@@ -124,20 +105,9 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 
 	@Override
 	public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
-		FlowFile inputFile = null;
-		if (context.hasIncomingConnection()) {
-			inputFile = session.get();
-
-			// If we have no FlowFile, and all incoming connections are self-loops then we can continue on.
-			// However, if we have no FlowFile and we have connections coming from other Processors, then
-			// we know that we should run only if we have a FlowFile.
-			if (inputFile == null) {
-				if (context.hasNonLoopConnection()) {
-					return;
-				}
-
-				inputFile = session.create();
-			}
+		FlowFile inputFile = getOptionalFlowFile(context, session);
+		if (inputFile == null) {
+			return;
 		}
 
 		Stopwatch stopwatch = Stopwatch.createStarted();
@@ -160,7 +130,6 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 			Throwable rootCause = Throwables.getRootCause(t);
 			context.yield();
 			logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
-			session.rollback(true);
 			session.transfer(inputFile, REL_FAILURE);
 		}
 	}
