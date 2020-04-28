@@ -175,6 +175,8 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					.add(QUERY)
 					.add(QUERY_TIMEOUT)
 					.add(OUTPUT_FORMAT)
+					.add(REASONING)
+					.add(REASONING_SCHEMA)
 					.build();
 
 	@Override
@@ -199,7 +201,7 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 		String queryStr = validationContext.getProperty(QUERY).getValue();
 		QueryType queryType = SPARQLUtil.getType(queryStr);
 
-		if (queryType != QueryType.SELECT || queryType != QueryType.GRAPH) {
+		if (queryType != QueryType.SELECT && queryType != QueryType.GRAPH) {
 			String msg = String.format("Unsupported query type: %s", queryType);
 			results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
 		}

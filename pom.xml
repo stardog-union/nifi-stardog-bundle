@@ -27,9 +27,20 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
+    <properties>
+        <stardog.version>7.2.1</stardog.version>
+    </properties>
+
     <modules>
         <module>nifi-stardog-processors</module>
         <module>nifi-stardog-nar</module>
     </modules>
+
+     <repositories>
+        <repository>
+            <id>stardog-public</id>
+            <url>https://maven.stardog.com</url>
+        </repository>
+    </repositories>
 
 </project>
