@@ -40,7 +40,7 @@
     </build>
 
     <properties>
-        <stardog.version>7.1.2</stardog.version>
+        <stardog.version>7.3.0</stardog.version>
     </properties>
 
     <repositories>
