@@ -57,7 +57,7 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 					.build();
 
 	@Override
-	protected void init(final ProcessorInitializationContext context) {
+	protected void init(ProcessorInitializationContext context) {
 
 	}
 
@@ -87,7 +87,7 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 	}
 
 	@Override
-	public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
+	public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
 		FlowFile inputFile = getOptionalFlowFile(context, session);
 		if (inputFile == null) {
 			return;

@@ -20,9 +20,9 @@ import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
 
-import static com.stardog.nifi.StardogClientService.PASSWORD;
-import static com.stardog.nifi.StardogClientService.SERVER;
-import static com.stardog.nifi.StardogClientService.USERNAME;
+import static com.stardog.nifi.StardogClientService.PASSWORD_DESCRIPTOR_BUILDER;
+import static com.stardog.nifi.StardogClientService.SERVER_DESCRIPTOR_BUILDER;
+import static com.stardog.nifi.StardogClientService.USERNAME_DESCRIPTOR_BUILDER;
 
 /**
  * AbstractStardogProcessor is a base class that contains utility functions for Stardog processors like
@@ -30,13 +30,19 @@ import static com.stardog.nifi.StardogClientService.USERNAME;
  */
 public abstract class AbstractStardogProcessor extends AbstractProcessor {
 
-	public static final PropertyDescriptor CLIENT_SERVICE = new PropertyDescriptor.Builder()
+	private static final PropertyDescriptor CLIENT_SERVICE = new PropertyDescriptor.Builder()
 			.name("stardog-client-service")
 			.displayName("Client Service")
 			.description("If configured, this property will use the assigned client service for connection pooling.")
 			.required(false)
 			.identifiesControllerService(StardogClientService.class)
 			.build();
+
+	private static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER.required(false).build();
+
+	private static final PropertyDescriptor USERNAME = USERNAME_DESCRIPTOR_BUILDER.required(false).build();
+
+	private static final PropertyDescriptor PASSWORD = PASSWORD_DESCRIPTOR_BUILDER.required(false).build();
 
 	public static final Relationship REL_SUCCESS = new Relationship.Builder()
 			.name("success")
@@ -62,9 +68,9 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 		                                                   .asControllerService(StardogClientService.class);
 
 		if (stardogClientService == null) {
-			String connectionURL = context.getProperty(SERVER).evaluateAttributeExpressions().getValue();
-			String username = context.getProperty(USERNAME).evaluateAttributeExpressions().getValue();
-			String password = context.getProperty(PASSWORD).evaluateAttributeExpressions().getValue();
+			String connectionURL = getNonNullProperty(context, SERVER);
+			String username = getNonNullProperty(context, USERNAME);
+			String password = getNonNullProperty(context, PASSWORD);
 			return ConnectionConfiguration.from(connectionURL)
 			                              .credentials(username, password)
 			                              .connect();
@@ -72,6 +78,14 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 		else {
 			return stardogClientService.connect();
 		}
+	}
+
+	private String getNonNullProperty(ProcessContext context, PropertyDescriptor descriptor) {
+		String value = context.getProperty(descriptor).evaluateAttributeExpressions().getValue();
+		if (value == null || value.isEmpty()) {
+			throw new IllegalArgumentException(descriptor.getDisplayName() + " property must be set.");
+		}
+		return value;
 	}
 
 	protected static final Validator IRI_VALIDATOR = (subject, input, context) -> {
@@ -95,7 +109,7 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 		       : Values.iri(conn.namespaces().map(iri).orElse(iri));
 	}
 
-	public static FlowFile getOptionalFlowFile(final ProcessContext context, final ProcessSession session) {
+	public static FlowFile getOptionalFlowFile(ProcessContext context, ProcessSession session) {
 		FlowFile inputFile = session.get();
 		// If we have no FlowFile, and all incoming connections are self-loops then we can continue on.
 		// However, if we have no FlowFile and we have connections coming from other Processors, then

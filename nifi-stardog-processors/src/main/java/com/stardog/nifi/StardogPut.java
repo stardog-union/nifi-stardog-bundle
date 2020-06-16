@@ -128,7 +128,7 @@ public class StardogPut extends AbstractStardogProcessor {
                     .build();
 
     @Override
-    protected void init(final ProcessorInitializationContext context) {
+    protected void init(ProcessorInitializationContext context) {
 
     }
 
@@ -143,7 +143,7 @@ public class StardogPut extends AbstractStardogProcessor {
     }
 
     @Override
-    public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
+    public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
         FlowFile inputFile = session.get();
         if (inputFile == null) {
             return;
@@ -205,7 +205,5 @@ public class StardogPut extends AbstractStardogProcessor {
             logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
             session.transfer(inputFile, REL_FAILURE);
         }
-
     }
-
 }

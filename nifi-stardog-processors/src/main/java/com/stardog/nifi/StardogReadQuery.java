@@ -163,7 +163,7 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					.build();
 
 	@Override
-	protected void init(final ProcessorInitializationContext context) {
+	protected void init(ProcessorInitializationContext context) {
 
 	}
 
@@ -203,7 +203,7 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 	}
 
 	@Override
-	public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
+	public void onTrigger(ProcessContext context, ProcessSession session) throws ProcessException {
 		FlowFile inputFile = getOptionalFlowFile(context, session);
 		if (inputFile == null) {
 			return;
@@ -238,9 +238,7 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					                 .schema(schema);
 
 
-			outputFile = session.write(inputFile, stream -> {
-				resultCount.setValue(executeQuery(query, stream, outputFormat));
-			});
+			outputFile = session.write(inputFile, stream -> resultCount.setValue(executeQuery(query, stream, outputFormat)));
 
 			outputFile = session.putAttribute(outputFile, RESULT_COUNT, resultCount.toString());
 

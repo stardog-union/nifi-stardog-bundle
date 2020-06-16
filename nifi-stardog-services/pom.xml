@@ -28,10 +28,5 @@
 			<version>${stardog.version}</version>
 			<type>pom</type>
 		</dependency>
-		<!--dependency>
-			<groupId>com.complexible.stardog</groupId>
-			<artifactId>stardog-api</artifactId>
-			<version>${stardog.version}</version>
-		</dependency-->
 	</dependencies>
 </project>
