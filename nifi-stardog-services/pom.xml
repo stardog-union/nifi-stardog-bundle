@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>com.stardog</groupId>
+		<artifactId>nifi-stardog-bundle</artifactId>
+		<version>0.1.3-SNAPSHOT</version>
+	</parent>
+
+	<artifactId>nifi-stardog-services</artifactId>
+	<packaging>jar</packaging>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.apache.nifi</groupId>
+			<artifactId>nifi-api</artifactId>
+			<version>${nifi.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.stardog</groupId>
+			<artifactId>nifi-stardog-connection-service-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.complexible.stardog</groupId>
+			<artifactId>client-http</artifactId>
+			<version>${stardog.version}</version>
+			<type>pom</type>
+		</dependency>
+		<!--dependency>
+			<groupId>com.complexible.stardog</groupId>
+			<artifactId>stardog-api</artifactId>
+			<version>${stardog.version}</version>
+		</dependency-->
+	</dependencies>
+</project>
