@@ -1,5 +1,6 @@
 package com.stardog.nifi;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -8,10 +9,12 @@ import com.complexible.stardog.api.ConnectionConfiguration;
 import com.stardog.stark.IRI;
 import com.stardog.stark.Values;
 
+import com.google.api.client.util.Sets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.Validator;
 import org.apache.nifi.flowfile.FlowFile;
@@ -19,6 +22,7 @@ import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
+import org.apache.nifi.processor.util.StandardValidators;
 
 import static com.stardog.nifi.StardogClientService.PASSWORD_DESCRIPTOR_BUILDER;
 import static com.stardog.nifi.StardogClientService.SERVER_DESCRIPTOR_BUILDER;
@@ -68,9 +72,9 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 		                                                   .asControllerService(StardogClientService.class);
 
 		if (stardogClientService == null) {
-			String connectionURL = getNonNullProperty(context, SERVER);
-			String username = getNonNullProperty(context, USERNAME);
-			String password = getNonNullProperty(context, PASSWORD);
+			String connectionURL = context.getProperty(SERVER).evaluateAttributeExpressions().getValue();
+			String username = context.getProperty(USERNAME).evaluateAttributeExpressions().getValue();
+			String password = context.getProperty(PASSWORD).evaluateAttributeExpressions().getValue();
 			return ConnectionConfiguration.from(connectionURL)
 			                              .credentials(username, password)
 			                              .connect();
@@ -80,13 +84,31 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 		}
 	}
 
-	private String getNonNullProperty(ProcessContext context, PropertyDescriptor descriptor) {
-		String value = context.getProperty(descriptor).evaluateAttributeExpressions().getValue();
-		if (value == null || value.isEmpty()) {
-			throw new IllegalArgumentException(descriptor.getDisplayName() + " property must be set.");
+	@Override
+	final protected Collection<ValidationResult> customValidate(ValidationContext validationContext) {
+		Set<ValidationResult> results = Sets.newHashSet();
+
+		if (!validationContext.getProperty(CLIENT_SERVICE).isSet()) {
+			// Optional properties are required if service is not set
+			validateProperty(validationContext, results, SERVER, StandardValidators.URI_VALIDATOR);
+			validateProperty(validationContext, results, USERNAME, StandardValidators.NON_EMPTY_VALIDATOR);
+			validateProperty(validationContext, results, PASSWORD, StandardValidators.NON_EMPTY_VALIDATOR);
 		}
-		return value;
+
+		customValidate(validationContext, results);
+
+		return results;
 	}
+
+	private void validateProperty(ValidationContext validationContext, Set<ValidationResult> results, PropertyDescriptor descriptor, Validator validator) {
+		String server = validationContext.getProperty(descriptor).getValue();
+		ValidationResult result = validator.validate(descriptor.getDisplayName(), server, validationContext);
+		if (!result.isValid()) {
+			results.add(result);
+		}
+	}
+
+	protected abstract void customValidate(ValidationContext validationContext, Set<ValidationResult> results);
 
 	protected static final Validator IRI_VALIDATOR = (subject, input, context) -> {
 		if (context.isExpressionLanguageSupported(subject) && context.isExpressionLanguagePresent(input)) {
@@ -109,7 +131,7 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 		       : Values.iri(conn.namespaces().map(iri).orElse(iri));
 	}
 
-	public static FlowFile getOptionalFlowFile(ProcessContext context, ProcessSession session) {
+	protected static FlowFile getOptionalFlowFile(ProcessContext context, ProcessSession session) {
 		FlowFile inputFile = session.get();
 		// If we have no FlowFile, and all incoming connections are self-loops then we can continue on.
 		// However, if we have no FlowFile and we have connections coming from other Processors, then

@@ -28,9 +28,10 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.nifi.annotation.behavior.EventDriven;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
-import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.components.ValidationContext;
+import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.ComponentLog;
@@ -46,7 +47,6 @@ import org.apache.nifi.processor.util.StandardValidators;
                        "are imported into Stardog via the provided mapping file.")
 @EventDriven
 @InputRequirement(InputRequirement.Requirement.INPUT_REQUIRED)
-@SeeAlso({})
 public class StardogPut extends AbstractStardogProcessor {
     // Impl note: We are cheating here by using QueryResultFormats constants for CSV and JSON input
     private static final Map<String, FileFormat> INPUT_FORMATS =
@@ -64,7 +64,7 @@ public class StardogPut extends AbstractStardogProcessor {
     public static final PropertyDescriptor MAPPING_FILE =
             new PropertyDescriptor.Builder()
                     .name("Mappings File")
-                    .description("The mapping file to be used when loading CSV or JSON data into Stardog. The mapping should be" +
+                    .description("The mapping file to be used when loading CSV or JSON data into Stardog. The mapping should be " +
                                  "provided in Stardog Mapping Syntax (SMS). The mapping file is not required " +
                                  "if input is already in RDF format.")
                     .required(false)
@@ -140,6 +140,10 @@ public class StardogPut extends AbstractStardogProcessor {
     @Override
     public final List<PropertyDescriptor> getSupportedPropertyDescriptors() {
         return PROPERTIES;
+    }
+
+    @Override
+    protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
     }
 
     @Override

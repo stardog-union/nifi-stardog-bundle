@@ -1,7 +1,6 @@
 package com.stardog.nifi;
 
 import java.io.OutputStream;
-import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +27,6 @@ import com.stardog.stark.query.io.QueryResultFormats;
 import com.stardog.stark.query.io.QueryResultWriters;
 import com.stardog.stark.query.io.SelectQueryResultWriter;
 
-import com.google.api.client.util.Sets;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -39,7 +37,6 @@ import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
 import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
-import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.PropertyValue;
@@ -65,7 +62,6 @@ import org.apache.nifi.processor.util.StandardValidators;
                        "and number of triples for CONSTRUCT or DESCRIBE queries.")
 @EventDriven
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
-@SeeAlso({})
 @WritesAttributes({ @WritesAttribute(attribute = "result.count", description = "The number of rows returned by the select query") })
 public class StardogReadQuery extends AbstractStardogProcessor {
 
@@ -178,9 +174,7 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 	}
 
 	@Override
-	protected Collection<ValidationResult> customValidate(ValidationContext validationContext) {
-		Set<ValidationResult> results = Sets.newHashSet();
-
+	protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
 		String queryStr = validationContext.getProperty(QUERY).getValue();
 		QueryType queryType = SPARQLUtil.getType(queryStr);
 
@@ -198,8 +192,6 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 				results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
 			}
 		}
-
-		return results;
 	}
 
 	@Override

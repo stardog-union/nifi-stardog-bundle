@@ -1,6 +1,5 @@
 package com.stardog.nifi;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -10,14 +9,12 @@ import com.complexible.common.rdf.query.SPARQLUtil.QueryType;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.UpdateQuery;
 
-import com.google.api.client.util.Sets;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import org.apache.nifi.annotation.behavior.EventDriven;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
-import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
@@ -38,7 +35,6 @@ import org.apache.nifi.processor.util.StandardValidators;
                        "attributes of that FlowFile will be available when evaluating the query but the contents of that file will not be used. ")
 @EventDriven
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
-@SeeAlso({})
 public class StardogUpdateQuery extends AbstractStardogProcessor {
 
 	public static final PropertyDescriptor QUERY =
@@ -72,9 +68,7 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 	}
 
 	@Override
-	protected Collection<ValidationResult> customValidate(ValidationContext validationContext) {
-		Set<ValidationResult> results = Sets.newHashSet();
-
+	protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
 		String queryStr = validationContext.getProperty(QUERY).getValue();
 		QueryType queryType = SPARQLUtil.getType(queryStr);
 
@@ -82,8 +76,6 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 			String msg = String.format("Unsupported query type: %s", queryType);
 			results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
 		}
-
-		return results;
 	}
 
 	@Override
