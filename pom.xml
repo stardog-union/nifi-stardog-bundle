@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-nar-bundles</artifactId>
-        <version>1.11.3</version>
+        <version>1.11.4</version>
     </parent>
 
     <groupId>com.stardog</groupId>
@@ -14,7 +14,7 @@
     <packaging>pom</packaging>
 
     <properties>
-        <nifi.version>1.11.3</nifi.version>
+        <nifi.version>1.11.4</nifi.version>
         <stardog.version>7.3.0</stardog.version>
     </properties>
 
