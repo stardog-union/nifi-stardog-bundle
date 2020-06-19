@@ -1,6 +1,7 @@
 package com.stardog.nifi;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
@@ -76,12 +77,24 @@ public class StardogPut extends AbstractStardogProcessor {
         }
     };
 
-    public static final PropertyDescriptor MAPPING_FILE =
+    public static final PropertyDescriptor MAPPINGS_FILE =
             new PropertyDescriptor.Builder()
                     .name("Mappings File")
                     .description("The mapping file to be used when loading CSV or JSON data into Stardog. The mapping should be " +
                                  "provided in Stardog Mapping Syntax (SMS). The mapping file is not required " +
                                  "if input is already in RDF format.")
+                    .required(false)
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    .addValidator(StandardValidators.FILE_EXISTS_VALIDATOR)
+                    .build();
+
+    public static final PropertyDescriptor PROPERTIES_FILE =
+            new PropertyDescriptor.Builder()
+                    .name("Properties File")
+                    .description("A Java-style Properties file to be used when loading CSV data into Stardog. The " +
+                                 "property keys are identical to those used by the virtual import admin CLI. " +
+                                 "Properties that are set in this file will supercede the individual processor " +
+                                 "property values.")
                     .required(false)
                     .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
                     .addValidator(StandardValidators.FILE_EXISTS_VALIDATOR)
@@ -224,7 +237,8 @@ public class StardogPut extends AbstractStardogProcessor {
             ImmutableList.<PropertyDescriptor>builder()
                     .addAll(DEFAULT_PROPERTIES)
                     .add(INPUT_FORMAT)
-                    .add(MAPPING_FILE)
+                    .add(MAPPINGS_FILE)
+                    .add(PROPERTIES_FILE)
                     .add(TARGET_GRAPH)
                     .add(CLEAR_TARGET_GRAPH)
                     .add(CSV_SEPARATOR)
@@ -251,6 +265,7 @@ public class StardogPut extends AbstractStardogProcessor {
         return PROPERTIES;
     }
 
+    // TODO: If CSV format and no mappings file then must have unique.key.sets, etc.
     @Override
     protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
     }
@@ -280,7 +295,7 @@ public class StardogPut extends AbstractStardogProcessor {
             if (inputFormat instanceof QueryResultFormat) {
                 VirtualGraphAdminConnection vgConn = connection.admin().as(VirtualGraphAdminConnection.class);
 
-                PropertyValue mappingsPath = context.getProperty(MAPPING_FILE).evaluateAttributeExpressions(inputFile);
+                PropertyValue mappingsPath = context.getProperty(MAPPINGS_FILE).evaluateAttributeExpressions(inputFile);
                 String mappingString = mappingsPath.isSet()
                                        ? Files2.toString(new File(mappingsPath.getValue()).toPath(), Charsets.UTF_8)
                                        : null;
@@ -306,6 +321,15 @@ public class StardogPut extends AbstractStardogProcessor {
                                       .setProperty(CSV_CLASS, VirtualGraphOptions.CSV_CLASS)
                                       .setProperty(UNIQUE_KEY_SETS, VirtualGraphOptions.UNIQUE_KEY_SETS)
                                       .build();
+
+                PropertyValue propertiesPath = context.getProperty(PROPERTIES_FILE).evaluateAttributeExpressions(inputFile);
+                if (propertiesPath.isSet()) {
+                    Properties propsFromFile = new Properties();
+                    try (FileInputStream is = new FileInputStream(propertiesPath.getValue())) {
+                        propsFromFile.load(is);
+                    }
+                    properties.putAll(propsFromFile);
+                }
 
                 vgConn.importFile(mappingString, properties, connection.name(), targetGraph, in, fileType);
             }
