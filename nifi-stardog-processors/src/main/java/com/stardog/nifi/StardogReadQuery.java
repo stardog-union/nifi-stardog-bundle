@@ -112,7 +112,7 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					.name("Query Timeout")
 					.description("The maximum amount of time allowed for a running query. Must be of format "
 					             + "<duration> <TimeUnit> where <duration> is a non-negative integer and TimeUnit is a supported "
-					             + "Time Unit, such as: nanos, millis, secs, mins, hrs, days. A value of zero means there is no limit. ")
+					             + "Time Unit, such as: nanos, millis, secs, mins, hrs, days. A value of zero means there is no limit.")
 					.defaultValue("0 seconds")
 					.required(true)
 					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
@@ -228,7 +228,6 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					                 .timeout(queryTimeout)
 					                 .reasoning(isReasoning)
 					                 .schema(schema);
-
 
 			outputFile = session.write(inputFile, stream -> resultCount.setValue(executeQuery(query, stream, outputFormat)));
 

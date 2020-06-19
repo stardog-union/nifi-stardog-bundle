@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.complexible.common.io.Files2;
 import com.complexible.stardog.api.Connection;
+import com.complexible.stardog.virtual.api.VirtualGraphOptions;
 import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection;
 import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection.InputFileType;
 import com.stardog.stark.IRI;
@@ -30,8 +31,10 @@ import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.components.Validator;
 import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.ComponentLog;
@@ -60,6 +63,18 @@ public class StardogPut extends AbstractStardogProcessor {
                     .put("N-Triples", RDFFormats.NTRIPLES)
                     .put("N-Quads", RDFFormats.NQUADS)
                     .build();
+
+    public static final Validator CHARACTER_VALIDATOR = new Validator() {
+        private final Validator stringLengthValidator = new StandardValidators.StringLengthValidator(1, 1);
+
+        public ValidationResult validate(String subject, String value, ValidationContext context) {
+            if (context.isExpressionLanguageSupported(subject) && context.isExpressionLanguagePresent(value)) {
+                return (new ValidationResult.Builder()).subject(subject).input(value).explanation("Expression Language Present").valid(true).build();
+            } else {
+                return stringLengthValidator.validate(subject, value, context);
+            }
+        }
+    };
 
     public static final PropertyDescriptor MAPPING_FILE =
             new PropertyDescriptor.Builder()
@@ -118,6 +133,93 @@ public class StardogPut extends AbstractStardogProcessor {
                     .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
                     .build();
 
+    public static final PropertyDescriptor CSV_SEPARATOR =
+            new PropertyDescriptor.Builder()
+                    .name("CSV Separator")
+                    .description("The character for separating fields in a delimited file. Defaults to comma (,).")
+                    .required(false)
+                    .defaultValue(",")
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    .addValidator(CHARACTER_VALIDATOR)
+                    .build();
+
+    public static final PropertyDescriptor CSV_QUOTE =
+            new PropertyDescriptor.Builder()
+                    .name("CSV Quote")
+                    .description("The character used to enclose fields in a delimited file. Used for strings that " +
+                                 "contain field separator characters. To escape a CSV Quote character within a " +
+                                 "string that is enclosed in CSV Quote characters, use two consecutive CSV Quote " +
+                                 "characters. Defaults to double quote (\").")
+                    .required(false)
+                    .defaultValue("\"")
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    // TODO: Fix #7911 - Allow no quote character for csv import
+//                    .addValidator(NULLABLE_CHARACTER_VALIDATOR) // Adapt CHARACTER_VALIDATOR to optionally allow 0-length
+                    .addValidator(CHARACTER_VALIDATOR)
+                    .build();
+
+    public static final PropertyDescriptor CSV_ESCAPE =
+            new PropertyDescriptor.Builder()
+                    .name("CSV Escape")
+                    .description("Character for escaping special characters in delimited files. Used as an " +
+                                 "alternative to the CSV Quote character. Defaults to unset.")
+                    .required(false)
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    .addValidator(CHARACTER_VALIDATOR)
+                    .build();
+
+    public static final PropertyDescriptor CSV_HEADER =
+            new PropertyDescriptor.Builder()
+                    .name("CSV Header")
+                    .description("Whether the delimited input file has a header line at the beginning. Defaults to true.")
+                    .required(false)
+                    .defaultValue("true")
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+                    .build();
+
+    public static final PropertyDescriptor CSV_SKIP_EMPTY =
+            new PropertyDescriptor.Builder()
+                    .name("CSV Skip Empty")
+                    .description("Whether to treat empty (zero-length) fields in delimited files as null. " +
+                                 "Defaults to true.")
+                    .required(false)
+                    .defaultValue("true")
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+                    .build();
+
+    public static final PropertyDescriptor BASE_URI =
+            new PropertyDescriptor.Builder()
+                    .name("Base URI")
+                    .description("The URI to use as a prefix for auto-generated CSV mappings.")
+                    .required(false)
+                    .defaultValue("http://api.stardog.com/")
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    .addValidator(StandardValidators.URI_VALIDATOR)
+                    .build();
+
+    public static final PropertyDescriptor CSV_CLASS =
+            new PropertyDescriptor.Builder()
+                    .name("CSV Class")
+                    .description("The class, or rdf:type, to use for the subjects of each row. Used when " +
+                                 "auto-generating mappings for delimited file import.")
+                    .required(false)
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    .addValidator(StandardValidators.URI_VALIDATOR)
+                    .build();
+
+    public static final PropertyDescriptor UNIQUE_KEY_SETS =
+            new PropertyDescriptor.Builder()
+                    .name("Unique Key Sets")
+                    .description("The set of columns that uniquely identify each row in a delimited file. Used to " +
+                                 "construct the subject template when auto-generating a delimited file mapping.")
+                    .required(false)
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                    // TODO: Custom validator
+                    .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+                    .build();
+
     private static final List<PropertyDescriptor> PROPERTIES =
             ImmutableList.<PropertyDescriptor>builder()
                     .addAll(DEFAULT_PROPERTIES)
@@ -125,11 +227,18 @@ public class StardogPut extends AbstractStardogProcessor {
                     .add(MAPPING_FILE)
                     .add(TARGET_GRAPH)
                     .add(CLEAR_TARGET_GRAPH)
+                    .add(CSV_SEPARATOR)
+                    .add(CSV_QUOTE)
+                    .add(CSV_ESCAPE)
+                    .add(CSV_HEADER)
+                    .add(CSV_SKIP_EMPTY)
+                    .add(CSV_CLASS)
+                    .add(BASE_URI)
+                    .add(UNIQUE_KEY_SETS)
                     .build();
 
     @Override
     protected void init(ProcessorInitializationContext context) {
-
     }
 
     @Override
@@ -170,8 +279,11 @@ public class StardogPut extends AbstractStardogProcessor {
 
             if (inputFormat instanceof QueryResultFormat) {
                 VirtualGraphAdminConnection vgConn = connection.admin().as(VirtualGraphAdminConnection.class);
-                File mappingFile = new File(context.getProperty(MAPPING_FILE).evaluateAttributeExpressions(inputFile).getValue());
-                String mappingString = Files2.toString(mappingFile.toPath(), Charsets.UTF_8);
+
+                PropertyValue mappingsPath = context.getProperty(MAPPING_FILE).evaluateAttributeExpressions(inputFile);
+                String mappingString = mappingsPath.isSet()
+                                       ? Files2.toString(new File(mappingsPath.getValue()).toPath(), Charsets.UTF_8)
+                                       : null;
 
                 if (clearTargetGraph) {
                     connection.begin();
@@ -182,8 +294,20 @@ public class StardogPut extends AbstractStardogProcessor {
                 InputFileType fileType = inputFormat.equals(QueryResultFormats.JSON)
                                          ? InputFileType.JSON
                                          : InputFileType.DELIMITED;
-                // TODO make properties customizable
-                vgConn.importFile(mappingString, new Properties(), connection.name(), targetGraph, in, fileType);
+
+                Properties properties =
+                        PropertySetter.builder(context, inputFile)
+                                      .setProperty(CSV_SEPARATOR, VirtualGraphOptions.CSV_SEPARATOR)
+                                      .setProperty(CSV_QUOTE, VirtualGraphOptions.CSV_QUOTE)
+                                      .setProperty(CSV_ESCAPE, VirtualGraphOptions.CSV_ESCAPE)
+                                      .setProperty(CSV_HEADER, VirtualGraphOptions.CSV_HEADER)
+                                      .setProperty(CSV_SKIP_EMPTY, VirtualGraphOptions.CSV_SKIP_EMPTY)
+                                      .setProperty(BASE_URI, VirtualGraphOptions.BASE_URI)
+                                      .setProperty(CSV_CLASS, VirtualGraphOptions.CSV_CLASS)
+                                      .setProperty(UNIQUE_KEY_SETS, VirtualGraphOptions.UNIQUE_KEY_SETS)
+                                      .build();
+
+                vgConn.importFile(mappingString, properties, connection.name(), targetGraph, in, fileType);
             }
             else {
                 connection.begin();
@@ -208,6 +332,37 @@ public class StardogPut extends AbstractStardogProcessor {
             context.yield();
             logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
             session.transfer(inputFile, REL_FAILURE);
+        }
+    }
+
+    static class PropertySetter {
+        private final ProcessContext mContext;
+        private final FlowFile mInputFile;
+        private final Properties mProperties = new Properties();
+
+        private PropertySetter(ProcessContext context, FlowFile inputFile) {
+            mContext = context;
+            mInputFile = inputFile;
+        }
+
+        static PropertySetter builder(ProcessContext context, FlowFile inputFile) {
+            return new PropertySetter(context, inputFile);
+        }
+
+        PropertySetter setProperty(PropertyDescriptor descriptor, String propertyName) {
+            PropertyValue propertyValue = mContext.getProperty(descriptor).evaluateAttributeExpressions(mInputFile);
+            if (propertyValue.isSet()) {
+                String value = propertyValue.getValue();
+                // org.apache.nifi.attribute.expression.language.StandardPreparedQuery.evaluateExpressions sets null results to ""
+                if (!value.isEmpty()) {
+                    mProperties.setProperty(propertyName, value);
+                }
+            }
+            return this;
+        }
+
+        Properties build() {
+            return mProperties;
         }
     }
 }
