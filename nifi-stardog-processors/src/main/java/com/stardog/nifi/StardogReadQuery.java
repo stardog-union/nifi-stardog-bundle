@@ -63,7 +63,7 @@ import org.apache.nifi.processor.util.StandardValidators;
 @EventDriven
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
 @WritesAttributes({ @WritesAttribute(attribute = "result.count", description = "The number of rows returned by the select query") })
-public class StardogReadQuery extends AbstractStardogProcessor {
+public class StardogReadQuery extends AbstractStardogQueryProcessor {
 
 	public static final String RESULT_COUNT = "result.count";
 
@@ -98,11 +98,20 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 					.put("N-Quads", formats(RDFFormats.NQUADS))
 					.build();
 
+	public static final PropertyDescriptor QUERY_NAME =
+			new PropertyDescriptor.Builder()
+					.name("Query Name")
+					.description("Stored SPARQL read query name")
+					.required(false)
+					.addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+					.build();
+
 	public static final PropertyDescriptor QUERY =
 			new PropertyDescriptor.Builder()
 					.name("Query")
 					.description("SPARQL read query")
-					.required(true)
+					.required(false)
 					.addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
 					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
 					.build();
@@ -151,12 +160,17 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 	private static final List<PropertyDescriptor> PROPERTIES =
 			ImmutableList.<PropertyDescriptor>builder()
 					.addAll(DEFAULT_PROPERTIES)
+					.add(QUERY_NAME)
 					.add(QUERY)
 					.add(QUERY_TIMEOUT)
 					.add(OUTPUT_FORMAT)
 					.add(REASONING)
 					.add(REASONING_SCHEMA)
 					.build();
+
+	public StardogReadQuery() {
+		super(QUERY_NAME, QUERY);
+	}
 
 	@Override
 	protected void init(ProcessorInitializationContext context) {
@@ -175,21 +189,25 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 
 	@Override
 	protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
+		validateQueryName(validationContext, results);
+
 		String queryStr = validationContext.getProperty(QUERY).getValue();
-		QueryType queryType = SPARQLUtil.getType(queryStr);
+		if (queryStr != null && !queryStr.trim().startsWith("$")) {
+			QueryType queryType = SPARQLUtil.getType(queryStr);
 
-		if (queryType != QueryType.SELECT && queryType != QueryType.GRAPH) {
-			String msg = String.format("Unsupported query type: %s", queryType);
-			results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
-		}
-		else {
-			String selectedFormat = validationContext.getProperty(OUTPUT_FORMAT).getValue();
-			Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
-			FileFormat outputFormat = outputFormats.get(queryType);
-
-			if (outputFormat == null) {
-				String msg = String.format("Query output format %s is not valid for given query type %s", selectedFormat, queryType);
+			if (queryType != QueryType.SELECT && queryType != QueryType.GRAPH) {
+				String msg = String.format("Unsupported query type: %s", queryType);
 				results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
+			}
+			else {
+				String selectedFormat = validationContext.getProperty(OUTPUT_FORMAT).getValue();
+				Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
+				FileFormat outputFormat = outputFormats.get(queryType);
+
+				if (outputFormat == null) {
+					String msg = String.format("Query output format %s is not valid for given query type %s", selectedFormat, queryType);
+					results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
+				}
 			}
 		}
 	}
@@ -207,23 +225,23 @@ public class StardogReadQuery extends AbstractStardogProcessor {
 
 		ComponentLog logger = getLogger();
 
-		long queryTimeout = context.getProperty(QUERY_TIMEOUT).evaluateAttributeExpressions(inputFile).asTimePeriod(TimeUnit.MILLISECONDS);
-		String queryStr = context.getProperty(QUERY).evaluateAttributeExpressions(inputFile).getValue();
-		QueryType queryType = SPARQLUtil.getType(queryStr);
-		String selectedFormat = context.getProperty(OUTPUT_FORMAT).getValue();
-		Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
-		FileFormat outputFormat = outputFormats.get(queryType);
-		boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
-		PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA).evaluateAttributeExpressions(inputFile);
-		String schema = schemaValue.isSet()
-		                ? schemaValue.getValue()
-		                : isReasoning
-		                  ? Schemas.DEFAULT
-		                  : Schemas.NULL;
-
-		MutableLong resultCount = new MutableLong(0L);
-
 		try (Connection connection = connect(context)) {
+			long queryTimeout = context.getProperty(QUERY_TIMEOUT).evaluateAttributeExpressions(inputFile).asTimePeriod(TimeUnit.MILLISECONDS);
+			String queryStr = getQueryString(context, inputFile, connection);
+			QueryType queryType = SPARQLUtil.getType(queryStr);
+			String selectedFormat = context.getProperty(OUTPUT_FORMAT).getValue();
+			Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
+			FileFormat outputFormat = outputFormats.get(queryType);
+			boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
+			PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA).evaluateAttributeExpressions(inputFile);
+			String schema = schemaValue.isSet()
+			                ? schemaValue.getValue()
+			                : isReasoning
+			                  ? Schemas.DEFAULT
+			                  : Schemas.NULL;
+
+			MutableLong resultCount = new MutableLong(0L);
+
 			Query<?> query = createQuery(connection, queryStr, queryType)
 					                 .timeout(queryTimeout)
 					                 .reasoning(isReasoning)

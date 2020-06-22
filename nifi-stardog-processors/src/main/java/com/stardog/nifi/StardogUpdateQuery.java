@@ -35,13 +35,22 @@ import org.apache.nifi.processor.util.StandardValidators;
                        "attributes of that FlowFile will be available when evaluating the query but the contents of that file will not be used. ")
 @EventDriven
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
-public class StardogUpdateQuery extends AbstractStardogProcessor {
+public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
+
+	public static final PropertyDescriptor QUERY_NAME =
+			new PropertyDescriptor.Builder()
+					.name("Query Name")
+					.description("Stored SPARQL update query name")
+					.required(false)
+					.addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+					.build();
 
 	public static final PropertyDescriptor QUERY =
 			new PropertyDescriptor.Builder()
 					.name("Query")
 					.description("SPARQL update query")
-					.required(true)
+					.required(false)
 					.addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
 					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
 					.build();
@@ -51,6 +60,10 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 					.addAll(DEFAULT_PROPERTIES)
 					.add(QUERY)
 					.build();
+
+	public StardogUpdateQuery() {
+		super(QUERY_NAME, QUERY);
+	}
 
 	@Override
 	protected void init(ProcessorInitializationContext context) {
@@ -69,12 +82,16 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 
 	@Override
 	protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
-		String queryStr = validationContext.getProperty(QUERY).getValue();
-		QueryType queryType = SPARQLUtil.getType(queryStr);
+		validateQueryName(validationContext, results);
 
-		if (queryType != QueryType.UPDATE) {
-			String msg = String.format("Unsupported query type: %s", queryType);
-			results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
+		String queryStr = validationContext.getProperty(QUERY).getValue();
+		if (queryStr != null && !queryStr.trim().startsWith("$")) {
+			QueryType queryType = SPARQLUtil.getType(queryStr);
+
+			if (queryType != QueryType.UPDATE) {
+				String msg = String.format("Unsupported query type: %s", queryType);
+				results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
+			}
 		}
 	}
 
@@ -89,9 +106,9 @@ public class StardogUpdateQuery extends AbstractStardogProcessor {
 
 		ComponentLog logger = getLogger();
 
-		String queryStr = context.getProperty(QUERY).evaluateAttributeExpressions(inputFile).getValue();
-
 		try (Connection connection = connect(context)) {
+			String queryStr = getQueryString(context, inputFile, connection);
+
 			UpdateQuery query = connection.update(queryStr);
 
 			query.execute();
