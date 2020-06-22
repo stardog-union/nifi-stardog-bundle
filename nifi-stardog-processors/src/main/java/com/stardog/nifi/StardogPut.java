@@ -265,9 +265,23 @@ public class StardogPut extends AbstractStardogProcessor {
         return PROPERTIES;
     }
 
-    // TODO: If CSV format and no mappings file then must have unique.key.sets, etc.
     @Override
     protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
+        PropertyValue inputFormatProperty = validationContext.getProperty(INPUT_FORMAT);
+        if (inputFormatProperty.isSet() &&
+            "CSV".equals(inputFormatProperty.getValue()) &&
+            !validationContext.getProperty(MAPPINGS_FILE).isSet() &&
+            !validationContext.getProperty(UNIQUE_KEY_SETS).isSet()) {
+            results.add(new ValidationResult.Builder().valid(false)
+                                                      .subject(UNIQUE_KEY_SETS.getDisplayName())
+                                                      .explanation(UNIQUE_KEY_SETS.getDisplayName() +
+                                                                   " must be set when " +
+                                                                   MAPPINGS_FILE.getDisplayName() +
+                                                                   " is not set and " +
+                                                                   INPUT_FORMAT.getDisplayName() +
+                                                                   " is CSV")
+                                                      .build());
+        }
     }
 
     @Override
