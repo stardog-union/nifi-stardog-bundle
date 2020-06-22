@@ -247,6 +247,8 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 					                 .reasoning(isReasoning)
 					                 .schema(schema);
 
+			getBindings(context, inputFile, connection).forEach(query::parameter);
+
 			outputFile = session.write(inputFile, stream -> resultCount.setValue(executeQuery(query, stream, outputFormat)));
 
 			outputFile = session.putAttribute(outputFile, RESULT_COUNT, resultCount.toString());

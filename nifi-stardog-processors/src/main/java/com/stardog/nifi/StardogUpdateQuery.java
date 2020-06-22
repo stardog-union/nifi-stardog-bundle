@@ -111,6 +111,8 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 
 			UpdateQuery query = connection.update(queryStr);
 
+			getBindings(context, inputFile, connection).forEach(query::parameter);
+
 			query.execute();
 
 			logger.info("Update completed; transferring {} to 'success'", new Object[] { inputFile });
