@@ -25,11 +25,11 @@ import org.apache.nifi.reporting.InitializationException;
 @CapabilityDescription("Provides a controller service that configures a connection to Stardog.")
 public class StardogControllerService extends AbstractControllerService implements StardogClientService {
 
-	private static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER.required(true).build();
+	static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER.required(true).build();
 
-	private static final PropertyDescriptor USERNAME = USERNAME_DESCRIPTOR_BUILDER.required(true).build();
+	static final PropertyDescriptor USERNAME = USERNAME_DESCRIPTOR_BUILDER.required(true).build();
 
-	private static final PropertyDescriptor PASSWORD = PASSWORD_DESCRIPTOR_BUILDER.required(true).build();
+	static final PropertyDescriptor PASSWORD = PASSWORD_DESCRIPTOR_BUILDER.required(true).build();
 
 	private static final List<PropertyDescriptor> SERVICE_PROPERTIES = ImmutableList.of(SERVER, USERNAME, PASSWORD);
 

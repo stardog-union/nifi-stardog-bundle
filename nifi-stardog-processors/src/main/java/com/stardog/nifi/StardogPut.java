@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -261,26 +262,36 @@ public class StardogPut extends AbstractStardogProcessor {
     }
 
     @Override
-    public final List<PropertyDescriptor> getSupportedPropertyDescriptors() {
+    public List<PropertyDescriptor> getSupportedPropertyDescriptors() {
         return PROPERTIES;
     }
 
     @Override
     protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
         PropertyValue inputFormatProperty = validationContext.getProperty(INPUT_FORMAT);
-        if (inputFormatProperty.isSet() &&
-            "CSV".equals(inputFormatProperty.getValue()) &&
-            !validationContext.getProperty(MAPPINGS_FILE).isSet() &&
-            !validationContext.getProperty(UNIQUE_KEY_SETS).isSet()) {
-            results.add(new ValidationResult.Builder().valid(false)
-                                                      .subject(UNIQUE_KEY_SETS.getDisplayName())
-                                                      .explanation(UNIQUE_KEY_SETS.getDisplayName() +
-                                                                   " must be set when " +
-                                                                   MAPPINGS_FILE.getDisplayName() +
-                                                                   " is not set and " +
-                                                                   INPUT_FORMAT.getDisplayName() +
-                                                                   " is CSV")
-                                                      .build());
+        if (inputFormatProperty.isSet() && !validationContext.getProperty(MAPPINGS_FILE).isSet()) {
+            if ("JSON".equals(inputFormatProperty.getValue())) {
+                results.add(new ValidationResult.Builder().valid(false)
+                                                          .subject(MAPPINGS_FILE.getDisplayName())
+                                                          .explanation(MAPPINGS_FILE.getDisplayName() +
+                                                                       " must be set when " +
+                                                                       INPUT_FORMAT.getDisplayName() +
+                                                                       " is JSON")
+                                                          .build());
+            }
+            else if ("CSV".equals(inputFormatProperty.getValue())) {
+                if (!validationContext.getProperty(UNIQUE_KEY_SETS).isSet()) {
+                    results.add(new ValidationResult.Builder().valid(false)
+                                                              .subject(UNIQUE_KEY_SETS.getDisplayName())
+                                                              .explanation(UNIQUE_KEY_SETS.getDisplayName() +
+                                                                           " must be set when " +
+                                                                           MAPPINGS_FILE.getDisplayName() +
+                                                                           " is not set and " +
+                                                                           INPUT_FORMAT.getDisplayName() +
+                                                                           " is CSV")
+                                                              .build());
+                }
+            }
         }
     }
 
@@ -302,7 +313,33 @@ public class StardogPut extends AbstractStardogProcessor {
             boolean clearTargetGraph =  context.getProperty(CLEAR_TARGET_GRAPH).evaluateAttributeExpressions(inputFile).asBoolean();
 
             String selectedFormat = context.getProperty(INPUT_FORMAT).getValue();
-            FileFormat inputFormat =  INPUT_FORMATS.get(selectedFormat);
+
+            FileFormat inputFormat;
+            if (selectedFormat == null) {
+                String filename = inputFile.getAttribute("filename");
+                if (filename == null) {
+                    throw new ProcessException("Unable to determine " + INPUT_FORMAT.getDisplayName() +
+                                               " because flow file does not have filename attribute set");
+                }
+                else {
+                    Optional<RDFFormat> rdfFormat = RDFFormats.forFile(filename);
+                    if (rdfFormat.isPresent() && !rdfFormat.get().name().isEmpty()) {
+                        inputFormat = rdfFormat.get();
+                    }
+                    else if (filename.toLowerCase().endsWith("json")) {
+                        inputFormat = QueryResultFormats.JSON;
+                    }
+                    else {
+                        inputFormat = QueryResultFormats.CSV;
+                    }
+                }
+            }
+            else {
+                inputFormat = INPUT_FORMATS.get(selectedFormat);
+                if (inputFormat == null) {
+                    throw new ProcessException(INPUT_FORMAT.getDisplayName() + " is not a supported value: " + selectedFormat);
+                }
+            }
 
             logger.info("Input format for ingestion {} ({})", new Object[] { inputFormat, inputFormat.getClass().getSimpleName() });
 

@@ -58,6 +58,7 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 	private static final List<PropertyDescriptor> PROPERTIES =
 			ImmutableList.<PropertyDescriptor>builder()
 					.addAll(DEFAULT_PROPERTIES)
+					.add(QUERY_NAME)
 					.add(QUERY)
 					.build();
 
@@ -76,7 +77,7 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 	}
 
 	@Override
-	public final List<PropertyDescriptor> getSupportedPropertyDescriptors() {
+	public List<PropertyDescriptor> getSupportedPropertyDescriptors() {
 		return PROPERTIES;
 	}
 
@@ -90,7 +91,10 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 
 			if (queryType != QueryType.UPDATE) {
 				String msg = String.format("Unsupported query type: %s", queryType);
-				results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
+				results.add(new ValidationResult.Builder().subject(QUERY.getDisplayName())
+				                                          .valid(false)
+				                                          .explanation(msg)
+				                                          .build());
 			}
 		}
 	}

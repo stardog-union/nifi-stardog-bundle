@@ -42,11 +42,11 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 			.identifiesControllerService(StardogClientService.class)
 			.build();
 
-	private static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER.required(false).build();
+	static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER.required(false).build();
 
-	private static final PropertyDescriptor USERNAME = USERNAME_DESCRIPTOR_BUILDER.required(false).build();
+	static final PropertyDescriptor USERNAME = USERNAME_DESCRIPTOR_BUILDER.required(false).build();
 
-	private static final PropertyDescriptor PASSWORD = PASSWORD_DESCRIPTOR_BUILDER.required(false).build();
+	static final PropertyDescriptor PASSWORD = PASSWORD_DESCRIPTOR_BUILDER.required(false).build();
 
 	public static final Relationship REL_SUCCESS = new Relationship.Builder()
 			.name("success")

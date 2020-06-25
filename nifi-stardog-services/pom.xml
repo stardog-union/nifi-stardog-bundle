@@ -28,5 +28,11 @@
 			<version>${stardog.version}</version>
 			<type>pom</type>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.nifi</groupId>
+			<artifactId>nifi-mock</artifactId>
+			<version>${nifi.version}</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 </project>

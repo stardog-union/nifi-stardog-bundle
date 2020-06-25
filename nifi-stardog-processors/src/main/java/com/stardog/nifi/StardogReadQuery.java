@@ -183,7 +183,7 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 	}
 
 	@Override
-	public final List<PropertyDescriptor> getSupportedPropertyDescriptors() {
+	public List<PropertyDescriptor> getSupportedPropertyDescriptors() {
 		return PROPERTIES;
 	}
 
@@ -197,7 +197,10 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 
 			if (queryType != QueryType.SELECT && queryType != QueryType.GRAPH) {
 				String msg = String.format("Unsupported query type: %s", queryType);
-				results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
+				results.add(new ValidationResult.Builder().subject(QUERY.getDisplayName())
+				                                          .valid(false)
+				                                          .explanation(msg)
+				                                          .build());
 			}
 			else {
 				String selectedFormat = validationContext.getProperty(OUTPUT_FORMAT).getValue();
@@ -205,8 +208,13 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 				FileFormat outputFormat = outputFormats.get(queryType);
 
 				if (outputFormat == null) {
-					String msg = String.format("Query output format %s is not valid for given query type %s", selectedFormat, queryType);
-					results.add(new ValidationResult.Builder().valid(false).explanation(msg).build());
+					String msg = String.format("Query output format %s is not valid for given query type %s",
+							selectedFormat, queryType);
+					results.add(new ValidationResult.Builder().subject(OUTPUT_FORMAT.getDisplayName())
+					                                          .input(selectedFormat)
+					                                          .valid(false)
+					                                          .explanation(msg)
+					                                          .build());
 				}
 			}
 		}
