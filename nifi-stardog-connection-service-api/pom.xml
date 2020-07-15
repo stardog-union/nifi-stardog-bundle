@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>com.stardog</groupId>
 		<artifactId>nifi-stardog-bundle</artifactId>
-		<version>0.2.0</version>
+		<version>0.2.1-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>nifi-stardog-connection-service-api</artifactId>
@@ -26,6 +26,18 @@
 			<groupId>com.complexible.stardog</groupId>
 			<artifactId>stardog-api</artifactId>
 			<version>${stardog.version}</version>
+		</dependency>
+
+		<!-- This service-api project does not depend on client-http directly. This dependency is here so it is
+		shared by the service and processor projects, loaded by a single class loader. When each project has its
+		own dependency it's possible to have, say, VirtualGraphAdminConnection loaded by one class loader and
+		HttpVirtualGraphAdminConnectionView loaded by another, leading to exceptions when we invoke
+		connection.admin().as(VirtualGraphAdminConnection.class). -->
+		<dependency>
+			<groupId>com.complexible.stardog</groupId>
+			<artifactId>client-http</artifactId>
+			<version>${stardog.version}</version>
+			<type>pom</type>
 		</dependency>
 	</dependencies>
 </project>
