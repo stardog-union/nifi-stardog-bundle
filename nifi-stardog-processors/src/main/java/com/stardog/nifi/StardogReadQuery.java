@@ -10,7 +10,6 @@ import java.util.concurrent.TimeUnit;
 import com.complexible.common.base.Objects2;
 import com.complexible.common.rdf.query.SPARQLUtil;
 import com.complexible.common.rdf.query.SPARQLUtil.QueryType;
-import com.complexible.stardog.Schemas;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.GraphQuery;
 import com.complexible.stardog.api.Query;
@@ -39,7 +38,6 @@ import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.components.PropertyDescriptor;
-import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.expression.ExpressionLanguageScope;
@@ -116,18 +114,6 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
 					.build();
 
-	public static final PropertyDescriptor QUERY_TIMEOUT =
-			new PropertyDescriptor.Builder()
-					.name("Query Timeout")
-					.description("The maximum amount of time allowed for a running query. Must be of format "
-					             + "<duration> <TimeUnit> where <duration> is a non-negative integer and TimeUnit is a supported "
-					             + "Time Unit, such as: nanos, millis, secs, mins, hrs, days. A value of zero means there is no limit.")
-					.defaultValue("0 seconds")
-					.required(true)
-					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-					.addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
-					.build();
-
 	public static final PropertyDescriptor OUTPUT_FORMAT =
 			new PropertyDescriptor.Builder()
 					.name("Output Format")
@@ -135,26 +121,6 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 					.required(true)
 					.allowableValues(OUTPUT_FORMATS.keySet())
 					.defaultValue(DEFAULT_FORMAT)
-					.build();
-
-	public static final PropertyDescriptor REASONING =
-			new PropertyDescriptor.Builder()
-					.name("Reasoning")
-					.description("Enable reasoning for the query.")
-					.required(true)
-					.defaultValue("false")
-					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-					.addValidator(StandardValidators.BOOLEAN_VALIDATOR)
-					.build();
-
-	public static final PropertyDescriptor REASONING_SCHEMA =
-			new PropertyDescriptor.Builder()
-					.name("Reasoning Schema")
-					.description("Select the reasoning schema to be used if reasoning is enabled. This value takes effect " +
-					             "only if reasoning option is enabled.")
-					.required(false)
-					.addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
 					.build();
 
 	private static final List<PropertyDescriptor> PROPERTIES =
@@ -241,12 +207,7 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 			Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
 			FileFormat outputFormat = outputFormats.get(queryType);
 			boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
-			PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA).evaluateAttributeExpressions(inputFile);
-			String schema = schemaValue.isSet()
-			                ? schemaValue.getValue()
-			                : isReasoning
-			                  ? Schemas.DEFAULT
-			                  : Schemas.NULL;
+			String schema = getSchema(context, inputFile, isReasoning);
 
 			MutableLong resultCount = new MutableLong(0L);
 

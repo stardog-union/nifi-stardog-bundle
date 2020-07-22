@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit;
 import com.complexible.common.rdf.query.SPARQLUtil;
 import com.complexible.common.rdf.query.SPARQLUtil.QueryType;
 import com.complexible.stardog.api.Connection;
-import com.complexible.stardog.api.UpdateQuery;
+import com.complexible.stardog.api.Query;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
@@ -60,6 +60,9 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 					.addAll(DEFAULT_PROPERTIES)
 					.add(QUERY_NAME)
 					.add(QUERY)
+					.add(QUERY_TIMEOUT)
+					.add(REASONING)
+					.add(REASONING_SCHEMA)
 					.build();
 
 	public StardogUpdateQuery() {
@@ -112,8 +115,14 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 
 		try (Connection connection = connect(context)) {
 			String queryStr = getQueryString(context, inputFile, connection);
+			long queryTimeout = context.getProperty(QUERY_TIMEOUT).evaluateAttributeExpressions(inputFile).asTimePeriod(TimeUnit.MILLISECONDS);
+			boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
+			String schema = getSchema(context, inputFile, isReasoning);
 
-			UpdateQuery query = connection.update(queryStr);
+			Query<Void> query = connection.update(queryStr)
+			                              .timeout(queryTimeout)
+			                              .reasoning(isReasoning)
+			                              .schema(schema);
 
 			getBindings(context, inputFile, connection).forEach(query::parameter);
 

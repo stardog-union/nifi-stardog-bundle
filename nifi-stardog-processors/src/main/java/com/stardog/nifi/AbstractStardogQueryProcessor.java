@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.complexible.common.rdf.rio.TurtleValueParser;
+import com.complexible.stardog.Schemas;
 import com.complexible.stardog.StardogException;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.security.StardogAuthorizationException;
@@ -21,8 +22,41 @@ import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.processor.util.StandardValidators;
 
 public abstract class AbstractStardogQueryProcessor extends AbstractStardogProcessor {
+
+	public static final PropertyDescriptor QUERY_TIMEOUT =
+			new PropertyDescriptor.Builder()
+					.name("Query Timeout")
+					.description("The maximum amount of time allowed for a running query. Must be of format "
+					             + "<duration> <TimeUnit> where <duration> is a non-negative integer and TimeUnit is a supported "
+					             + "Time Unit, such as: nanos, millis, secs, mins, hrs, days. A value of zero means there is no limit.")
+					.defaultValue("0 seconds")
+					.required(true)
+					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+					.addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+					.build();
+
+	public static final PropertyDescriptor REASONING =
+			new PropertyDescriptor.Builder()
+					.name("Reasoning")
+					.description("Enable reasoning for the query.")
+					.required(true)
+					.defaultValue("false")
+					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+					.addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+					.build();
+
+	public static final PropertyDescriptor REASONING_SCHEMA =
+			new PropertyDescriptor.Builder()
+					.name("Reasoning Schema")
+					.description("Select the reasoning schema to be used if reasoning is enabled. This value takes effect " +
+					             "only if reasoning option is enabled.")
+					.required(false)
+					.addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+					.expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+					.build();
 
 	private final PropertyDescriptor mQueryNameDescriptor;
 
@@ -124,5 +158,14 @@ public abstract class AbstractStardogQueryProcessor extends AbstractStardogProce
 			getLogger().info("Could not retrieve namespaces from database, proceeding without them.");
 		}
 		return aNamespaces;
+	}
+
+	protected String getSchema(ProcessContext context, FlowFile inputFile, boolean isReasoning) {
+		PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA).evaluateAttributeExpressions(inputFile);
+		return schemaValue.isSet()
+		       ? schemaValue.getValue()
+		       : isReasoning
+		         ? Schemas.DEFAULT
+		         : Schemas.NULL;
 	}
 }
