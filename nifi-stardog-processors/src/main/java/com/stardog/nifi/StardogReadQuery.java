@@ -154,10 +154,10 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 	}
 
 	@Override
-	protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
-		validateQueryName(validationContext, results);
+	protected void customValidate(ValidationContext context, Set<ValidationResult> results) {
+		validateQueryName(context, results);
 
-		String queryStr = validationContext.getProperty(QUERY).getValue();
+		String queryStr = context.getProperty(QUERY).getValue();
 		if (queryStr != null && !queryStr.trim().startsWith("$")) {
 			QueryType queryType = SPARQLUtil.getType(queryStr);
 
@@ -169,7 +169,7 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 				                                          .build());
 			}
 			else {
-				String selectedFormat = validationContext.getProperty(OUTPUT_FORMAT).getValue();
+				String selectedFormat = context.getProperty(OUTPUT_FORMAT).getValue();
 				Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
 				FileFormat outputFormat = outputFormats.get(queryType);
 
@@ -184,6 +184,8 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 				}
 			}
 		}
+
+		validateSchema(context, results);
 	}
 
 	@Override
@@ -207,14 +209,18 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 			Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
 			FileFormat outputFormat = outputFormats.get(queryType);
 			boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
-			String schema = getSchema(context, inputFile, isReasoning);
 
 			MutableLong resultCount = new MutableLong(0L);
 
 			Query<?> query = createQuery(connection, queryStr, queryType)
 					                 .timeout(queryTimeout)
-					                 .reasoning(isReasoning)
-					                 .schema(schema);
+					                 .reasoning(isReasoning);
+
+			if (isReasoning) {
+				// Ignore schema if reasoning is off.
+				String schema = getSchema(context, inputFile, isReasoning);
+				query.schema(schema);
+			}
 
 			getBindings(context, inputFile, connection).forEach(query::parameter);
 

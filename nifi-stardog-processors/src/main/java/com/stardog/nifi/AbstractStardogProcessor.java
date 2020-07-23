@@ -4,9 +4,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import com.complexible.stardog.Schemas;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.ConnectionConfiguration;
+import com.complexible.stardog.metadata.MetaProperties;
+import com.complexible.stardog.reasoning.ReasoningOptions;
 import com.stardog.stark.IRI;
 import com.stardog.stark.Values;
 
@@ -15,11 +16,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.nifi.components.PropertyDescriptor;
-import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.Validator;
-import org.apache.nifi.expression.ExpressionLanguageScope;
+import org.apache.nifi.context.PropertyContext;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
@@ -37,7 +37,12 @@ import static com.stardog.nifi.StardogClientService.USERNAME_DESCRIPTOR_BUILDER;
  */
 public abstract class AbstractStardogProcessor extends AbstractProcessor {
 
-	private static final PropertyDescriptor CLIENT_SERVICE = new PropertyDescriptor.Builder()
+	static {
+		// Needed to load reasoning.schemas property
+		MetaProperties.register(ReasoningOptions.class);
+	}
+
+	static final PropertyDescriptor CLIENT_SERVICE = new PropertyDescriptor.Builder()
 			.name("stardog-client-service")
 			.displayName("Client Service")
 			.description("If configured, this property will use the assigned client service for connection pooling.")
@@ -70,7 +75,8 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 
 	public static final Set<Relationship> DEFAULT_RELATIONSHIPS = ImmutableSet.of(REL_SUCCESS, REL_FAILURE, REL_RETRY);
 
-	protected Connection connect(ProcessContext context) {
+	protected ConnectionConfiguration getConnectionConfiguration(PropertyContext context) {
+		ConnectionConfiguration configuration;
 		StardogClientService stardogClientService = context.getProperty(CLIENT_SERVICE)
 		                                                   .asControllerService(StardogClientService.class);
 
@@ -78,13 +84,17 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 			String connectionURL = context.getProperty(SERVER).evaluateAttributeExpressions().getValue();
 			String username = context.getProperty(USERNAME).evaluateAttributeExpressions().getValue();
 			String password = context.getProperty(PASSWORD).evaluateAttributeExpressions().getValue();
-			return ConnectionConfiguration.from(connectionURL)
-			                              .credentials(username, password)
-			                              .connect();
+			configuration = ConnectionConfiguration.from(connectionURL)
+			                                       .credentials(username, password);
 		}
 		else {
-			return stardogClientService.connect();
+			configuration = stardogClientService.getConnectionConfiguration();
 		}
+		return configuration;
+	}
+
+	protected Connection connect(PropertyContext context) {
+		return getConnectionConfiguration(context).connect();
 	}
 
 	@Override

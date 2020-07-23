@@ -2,7 +2,6 @@ package com.stardog.nifi;
 
 import java.util.List;
 
-import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.ConnectionConfiguration;
 
 import com.google.common.collect.ImmutableList;
@@ -14,7 +13,6 @@ import org.apache.nifi.controller.AbstractControllerService;
 import org.apache.nifi.controller.ConfigurationContext;
 import org.apache.nifi.controller.ControllerService;
 import org.apache.nifi.controller.ControllerServiceInitializationContext;
-import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.Processor;
 import org.apache.nifi.reporting.InitializationException;
 
@@ -57,17 +55,7 @@ public class StardogControllerService extends AbstractControllerService implemen
 	}
 
 	@Override
-	public Connection connect() {
-		// TODO Use connection pooling
-
-		ComponentLog log = getLogger();
-
-		Connection connection = ConnectionConfiguration.from(connectionURL)
-		                                               .credentials(username, password)
-		                                               .connect();
-
-		log.info("Connected to Stardog: {}", new Object[] { connectionURL });
-
-		return connection;
+	public ConnectionConfiguration getConnectionConfiguration() {
+		return ConnectionConfiguration.from(connectionURL).credentials(username, password);
 	}
 }

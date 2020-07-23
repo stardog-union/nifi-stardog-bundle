@@ -7,8 +7,10 @@ import com.complexible.common.rdf.rio.TurtleValueParser;
 import com.complexible.stardog.Schemas;
 import com.complexible.stardog.StardogException;
 import com.complexible.stardog.api.Connection;
+import com.complexible.stardog.api.ConnectionConfiguration;
+import com.complexible.stardog.api.reasoning.ReasoningConnection;
+import com.complexible.stardog.api.reasoning.SchemaManager;
 import com.complexible.stardog.security.StardogAuthorizationException;
-
 import com.stardog.stark.Namespaces;
 import com.stardog.stark.Value;
 
@@ -18,6 +20,7 @@ import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.Validator;
+import org.apache.nifi.context.PropertyContext;
 import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessContext;
@@ -167,5 +170,43 @@ public abstract class AbstractStardogQueryProcessor extends AbstractStardogProce
 		       : isReasoning
 		         ? Schemas.DEFAULT
 		         : Schemas.NULL;
+	}
+
+	protected void validateSchema(ValidationContext context, Set<ValidationResult> results) {
+		PropertyValue schema = context.getProperty(REASONING_SCHEMA);
+		if (schema.isSet() && !schema.getValue().contains("$")) {
+			try (Connection connection = connect(context)) {
+				SchemaManager schemaManager = connection.as(ReasoningConnection.class).getSchemaManager();
+				Set<String> schemas = schemaManager.getSchemas();
+				if (!schemas.contains(schema.getValue())) {
+					String msg = String.format("Unrecognized schema: '%s'. Valid values: %s", schema, schemas);
+					results.add(new ValidationResult.Builder().subject(REASONING_SCHEMA.getDisplayName())
+					                                          .valid(false)
+					                                          .explanation(msg)
+					                                          .build());
+				}
+			}
+			catch (RuntimeException e) {
+				getLogger().debug("Error validating schema: ", e);
+			}
+		}
+	}
+
+	protected Connection connect(PropertyContext context) {
+		ConnectionConfiguration configuration = getConnectionConfiguration(context);
+
+		PropertyValue reasoningValue = context.getProperty(REASONING);
+		if (reasoningValue.isSet() && !reasoningValue.getValue().contains("$")) {
+			configuration.reasoning(reasoningValue.asBoolean());
+
+			if (reasoningValue.asBoolean()) {
+				PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA);
+				if (schemaValue.isSet() && !schemaValue.getValue().contains("$")) {
+					configuration.schema(schemaValue.getValue());
+				}
+			}
+		}
+
+		return configuration.connect();
 	}
 }

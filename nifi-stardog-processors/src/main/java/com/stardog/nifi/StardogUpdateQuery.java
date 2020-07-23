@@ -85,10 +85,10 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 	}
 
 	@Override
-	protected void customValidate(ValidationContext validationContext, Set<ValidationResult> results) {
-		validateQueryName(validationContext, results);
+	protected void customValidate(ValidationContext context, Set<ValidationResult> results) {
+		validateQueryName(context, results);
 
-		String queryStr = validationContext.getProperty(QUERY).getValue();
+		String queryStr = context.getProperty(QUERY).getValue();
 		if (queryStr != null && !queryStr.trim().startsWith("$")) {
 			QueryType queryType = SPARQLUtil.getType(queryStr);
 
@@ -100,6 +100,8 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 				                                          .build());
 			}
 		}
+
+		validateSchema(context, results);
 	}
 
 	@Override
@@ -117,12 +119,16 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 			String queryStr = getQueryString(context, inputFile, connection);
 			long queryTimeout = context.getProperty(QUERY_TIMEOUT).evaluateAttributeExpressions(inputFile).asTimePeriod(TimeUnit.MILLISECONDS);
 			boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
-			String schema = getSchema(context, inputFile, isReasoning);
 
 			Query<Void> query = connection.update(queryStr)
 			                              .timeout(queryTimeout)
-			                              .reasoning(isReasoning)
-			                              .schema(schema);
+			                              .reasoning(isReasoning);
+
+			if (isReasoning) {
+				// Ignore schema if reasoning is off.
+				String schema = getSchema(context, inputFile, isReasoning);
+				query.schema(schema);
+			}
 
 			getBindings(context, inputFile, connection).forEach(query::parameter);
 

@@ -1,6 +1,7 @@
 package com.stardog.nifi;
 
 import com.complexible.stardog.api.Connection;
+import com.complexible.stardog.api.ConnectionConfiguration;
 
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.controller.ControllerService;
@@ -28,5 +29,5 @@ public interface StardogClientService extends ControllerService {
 			.expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
 			.addValidator(StandardValidators.NON_EMPTY_VALIDATOR);
 
-	Connection connect();
+	ConnectionConfiguration getConnectionConfiguration();
 }
