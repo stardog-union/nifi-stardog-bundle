@@ -1,8 +1,13 @@
+// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
+// For more information about licensing and copyright of this software, please contact
+// sales@stardog.com or visit http://stardog.com
+
 package com.stardog.nifi;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -376,7 +381,7 @@ public class StardogPut extends AbstractStardogProcessor {
                 PropertyValue propertiesPath = context.getProperty(PROPERTIES_FILE).evaluateAttributeExpressions(inputFile);
                 if (propertiesPath.isSet()) {
                     Properties propsFromFile = new Properties();
-                    try (FileInputStream is = new FileInputStream(propertiesPath.getValue())) {
+                    try (InputStream is = Files.newInputStream(Paths.get(propertiesPath.getValue()))) {
                         propsFromFile.load(is);
                     }
                     properties.putAll(propsFromFile);

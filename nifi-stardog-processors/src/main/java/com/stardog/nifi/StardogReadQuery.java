@@ -1,3 +1,7 @@
+// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
+// For more information about licensing and copyright of this software, please contact
+// sales@stardog.com or visit http://stardog.com
+
 package com.stardog.nifi;
 
 import java.io.OutputStream;
@@ -246,7 +250,6 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 	}
 
 	private Query<?> createQuery(Connection connection, String queryStr, QueryType queryType) {
-		// TODO support stored queries
 		switch (queryType) {
 			case SELECT:
 				return connection.select(queryStr);
