@@ -1,6 +1,9 @@
-# Stardog NiFi plugin
+# This is the OLD Stardog NiFi plugin
 
-This repository contains the Stardog processors for Apache NiFi system.
+This project HAS MOVED and is not longer in service.
+
+See https://github.com/stardog-union/stardog/tree/develop/nifi for the latest Stardog NiFi bundle
+
 
 ## Building
 
