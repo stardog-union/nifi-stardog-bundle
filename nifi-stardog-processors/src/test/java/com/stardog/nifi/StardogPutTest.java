@@ -1,6 +1,8 @@
-package com.stardog.nifi;
+// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
+// For more information about licensing and copyright of this software, please contact
+// sales@stardog.com or visit http://stardog.com
 
-import java.util.Objects;
+package com.stardog.nifi;
 
 import org.apache.nifi.util.TestRunner;
 import org.junit.Test;
@@ -10,6 +12,8 @@ import static com.stardog.nifi.StardogPut.MAPPINGS_FILE;
 import static com.stardog.nifi.StardogPut.UNIQUE_KEY_SETS;
 
 public class StardogPutTest extends AbstractStardogProcessorTest {
+
+	public static final String RESOURCES = "nifi/test/src/test/resources/";
 
 	@Override
 	protected Class<? extends AbstractStardogProcessor> getProcessorClass() {
@@ -47,6 +51,6 @@ public class StardogPutTest extends AbstractStardogProcessorTest {
 	}
 
 	private String getTestMappingFile() {
-		return Objects.requireNonNull(this.getClass().getClassLoader().getResource("mappings_file.sms")).getPath();
+		return RESOURCES + "mappings_file.sms";
 	}
 }
