@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.complexible.common.io.Files2;
 import com.complexible.stardog.api.Connection;
+import com.complexible.stardog.virtual.api.DataSourceOptions;
 import com.complexible.stardog.virtual.api.VirtualGraphOptions;
 import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection;
 import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection.InputFileType;
@@ -375,7 +376,7 @@ public class StardogPut extends AbstractStardogProcessor {
                                       .setProperty(CSV_SKIP_EMPTY, VirtualGraphOptions.CSV_SKIP_EMPTY)
                                       .setProperty(BASE_URI, VirtualGraphOptions.BASE_URI)
                                       .setProperty(CSV_CLASS, VirtualGraphOptions.CSV_CLASS)
-                                      .setProperty(UNIQUE_KEY_SETS, VirtualGraphOptions.UNIQUE_KEY_SETS)
+                                      .setProperty(UNIQUE_KEY_SETS, DataSourceOptions.UNIQUE_KEY_SETS)
                                       .build();
 
                 PropertyValue propertiesPath = context.getProperty(PROPERTIES_FILE).evaluateAttributeExpressions(inputFile);
