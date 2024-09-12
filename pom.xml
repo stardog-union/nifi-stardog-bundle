@@ -15,7 +15,7 @@
 
     <properties>
         <nifi.version>1.11.4</nifi.version>
-        <stardog.version>7.3.0</stardog.version>
+        <stardog.version>7.4.5</stardog.version>
     </properties>
 
     <modules>
