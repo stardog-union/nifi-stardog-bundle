@@ -13,7 +13,7 @@ import static com.stardog.nifi.StardogPut.UNIQUE_KEY_SETS;
 
 public class StardogPutTest extends AbstractStardogProcessorTest {
 
-	public static final String RESOURCES = "nifi/test/src/test/resources/";
+	public static final String RESOURCES = "src/test/resources/";
 
 	@Override
 	protected Class<? extends AbstractStardogProcessor> getProcessorClass() {
