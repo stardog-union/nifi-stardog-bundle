@@ -40,6 +40,7 @@ import static com.stardog.nifi.StardogClientService.PASSWORD;
 import static com.stardog.nifi.StardogClientService.SERVER_DESCRIPTOR_BUILDER;
 import static com.stardog.nifi.StardogClientService.USERNAME;
 import static com.stardog.nifi.StardogClientService.UsernamePasswordSupplier;
+import static org.apache.nifi.expression.ExpressionLanguageScope.FLOWFILE_ATTRIBUTES;
 
 /**
  * AbstractStardogProcessor is a base class that contains utility functions for Stardog processors like
@@ -61,7 +62,10 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 					.identifiesControllerService(StardogClientService.class)
 					.build();
 
-	static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER.required(false).build();
+	static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER
+			.required(false)
+			.expressionLanguageSupported(FLOWFILE_ATTRIBUTES)
+			.build();
 
 	/**
 	 * The use of {@link KerberosCredentialsService} allows the separation of the specification of the keytab file

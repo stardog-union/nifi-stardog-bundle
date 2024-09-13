@@ -14,8 +14,8 @@
     <packaging>pom</packaging>
 
     <properties>
-        <nifi.version>1.11.4</nifi.version>
-        <stardog.version>8.0.0</stardog.version>
+        <nifi.version>1.21.0</nifi.version>
+        <stardog.version>9.1.0</stardog.version>
     </properties>
 
     <modules>
