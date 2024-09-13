@@ -5,7 +5,10 @@
 package com.stardog.nifi;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -17,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.complexible.common.io.Files2;
 import com.complexible.stardog.api.Connection;
+import com.complexible.stardog.api.IO;
 import com.complexible.stardog.virtual.api.DataSourceOptions;
 import com.complexible.stardog.virtual.api.VirtualGraphOptions;
 import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection;
@@ -28,12 +32,12 @@ import com.stardog.stark.io.RDFFormat;
 import com.stardog.stark.io.RDFFormats;
 import com.stardog.stark.query.io.QueryResultFormat;
 import com.stardog.stark.query.io.QueryResultFormats;
-
 import com.google.common.base.Charsets;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.ByteStreams;
 import org.apache.nifi.annotation.behavior.EventDriven;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
@@ -359,8 +363,14 @@ public class StardogPut extends AbstractStardogProcessor {
 
                 if (clearTargetGraph) {
                     connection.begin();
-                    connection.remove().context(targetGraph);
-                    connection.commit();
+                    try {
+                        connection.remove().context(targetGraph);
+                        connection.commit();
+                    }
+                    catch (Throwable t) {
+                        connection.rollback();
+                        throw t;
+                    }
                 }
 
                 InputFileType fileType = inputFormat.equals(QueryResultFormats.JSON)
@@ -392,15 +402,27 @@ public class StardogPut extends AbstractStardogProcessor {
             }
             else {
                 connection.begin();
-                if (clearTargetGraph) {
-                    connection.remove().context(targetGraph);
+                try {
+                    if (clearTargetGraph) {
+                        connection.remove().context(targetGraph);
+                    }
+                    IO io = connection.add()
+                                      .io()
+                                      .format((RDFFormat) inputFormat)
+                                      .context(targetGraph);
+                    if (isKerberosCredentials(context)) {
+                        // HACK: Work around MainClientExec.execute requiring restartable entity with krb5 negotiation
+                        ioByTempFile(connection, in, io);
+                    }
+                    else {
+                        io.stream(in);
+                        connection.commit();
+                    }
                 }
-                connection.add()
-                          .io()
-                          .format((RDFFormat) inputFormat)
-                          .context(targetGraph)
-                          .stream(in);
-                connection.commit();
+                catch (Throwable t) {
+                    connection.rollback();
+                    throw t;
+                }
             }
 
             logger.info("Finished ingesting data into Stardog; transferring to 'success'", new Object[] { });
@@ -413,6 +435,26 @@ public class StardogPut extends AbstractStardogProcessor {
             context.yield();
             logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
             session.transfer(inputFile, REL_FAILURE);
+        }
+    }
+
+    private boolean isKerberosCredentials(ProcessContext context) {
+        return context.getProperty(KERBEROS_CREDENTIALS_SERVICE) != null;
+    }
+
+    private void ioByTempFile(Connection connection, InputStream in, IO io) throws IOException {
+        File tempFile = File.createTempFile("StardogPut", "tmp");
+        try (OutputStream os = new FileOutputStream(tempFile)) {
+            ByteStreams.copy(in, os);
+            os.close();
+            in.close();
+            io.file(tempFile.toPath());
+            connection.commit();
+        }
+        finally {
+            if (!tempFile.delete()) {
+                tempFile.deleteOnExit();
+            }
         }
     }
 
