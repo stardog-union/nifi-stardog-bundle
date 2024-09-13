@@ -26,6 +26,8 @@ import org.apache.nifi.controller.ControllerServiceInitializationContext;
 import org.apache.nifi.processor.Processor;
 import org.apache.nifi.reporting.InitializationException;
 
+import static org.apache.nifi.expression.ExpressionLanguageScope.VARIABLE_REGISTRY;
+
 /**
  * A {@link ControllerService} that provides common options, such as credentials and connection string, for all
  * Stardog {@link Processor processors}.
@@ -34,7 +36,10 @@ import org.apache.nifi.reporting.InitializationException;
 @CapabilityDescription("Provides a controller service that configures a connection to Stardog.")
 public class StardogControllerService extends AbstractControllerService implements StardogClientService {
 
-	static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER.required(true).build();
+	static final PropertyDescriptor SERVER = SERVER_DESCRIPTOR_BUILDER
+			.required(true)
+			.expressionLanguageSupported(VARIABLE_REGISTRY)
+			.build();
 
 	private static final List<PropertyDescriptor> SERVICE_PROPERTIES = ImmutableList.of(SERVER, USERNAME, PASSWORD);
 
