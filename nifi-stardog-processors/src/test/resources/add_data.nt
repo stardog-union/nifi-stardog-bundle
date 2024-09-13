@@ -1,0 +1,5 @@
+<urn:test> <urn:p> "some value".
+<urn:test> <urn:p> "some other value".
+<urn:test2> <urn:p2> <urn:test>.
+<urn:test3> <urn:p3> <urn:test>.
+<urn:test3> <urn:p> "new value".

@@ -197,17 +197,19 @@ public abstract class AbstractStardogQueryProcessor extends AbstractStardogProce
 	}
 
 	protected Connection connect(PropertyContext context) {
+		return connect(context, null);
+	}
+
+	protected Connection connect(PropertyContext context, FlowFile inputFile) {
 		ConnectionConfiguration configuration = getConnectionConfiguration(context);
 
-		PropertyValue reasoningValue = context.getProperty(REASONING);
-		if (reasoningValue.isSet() && !reasoningValue.getValue().contains("$")) {
-			configuration.reasoning(reasoningValue.asBoolean());
+		PropertyValue reasoningValue = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile);
+		configuration.reasoning(reasoningValue.asBoolean());
 
-			if (reasoningValue.asBoolean()) {
-				PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA);
-				if (schemaValue.isSet() && !schemaValue.getValue().contains("$")) {
-					configuration.schema(schemaValue.getValue());
-				}
+		if (reasoningValue.asBoolean()) {
+			PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA).evaluateAttributeExpressions(inputFile);
+			if (schemaValue.isSet()) {
+				configuration.schema(schemaValue.evaluateAttributeExpressions(inputFile).getValue());
 			}
 		}
 
