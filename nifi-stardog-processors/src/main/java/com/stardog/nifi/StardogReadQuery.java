@@ -32,11 +32,11 @@ import com.stardog.stark.query.io.QueryResultFormats;
 import com.stardog.stark.query.io.QueryResultWriters;
 import com.stardog.stark.query.io.SelectQueryResultWriter;
 
-import com.google.api.client.util.ByteStreams;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.ByteStreams;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.nifi.annotation.behavior.EventDriven;
 import org.apache.nifi.annotation.behavior.InputRequirement;

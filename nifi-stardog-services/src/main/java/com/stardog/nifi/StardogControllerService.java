@@ -10,8 +10,8 @@ import java.util.Set;
 
 import com.complexible.stardog.api.ConnectionConfiguration;
 
-import com.google.api.client.util.Sets;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Sets;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnEnabled;
