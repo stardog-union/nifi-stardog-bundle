@@ -21,11 +21,13 @@ import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.util.MockProcessContext;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
+import org.hamcrest.Matchers;
 import org.junit.Assume;
 
-import static com.stardog.nifi.AbstractStardogProcessor.PASSWORD;
 import static com.stardog.nifi.AbstractStardogProcessor.SERVER;
-import static com.stardog.nifi.AbstractStardogProcessor.USERNAME;
+import static com.stardog.nifi.StardogClientService.PASSWORD;
+import static com.stardog.nifi.StardogClientService.USERNAME;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
@@ -170,5 +172,18 @@ public abstract class AbstractStardogProcessorTest {
 			System.err.println("Contents differ: " + failureMsg);
 			fail(failureMsg.toString());
 		}
+	}
+
+	protected void assertValidationResults(TestRunner runner, String... messages) {
+		Collection<ValidationResult> results = null;
+		if (runner.getProcessContext() instanceof MockProcessContext) {
+			results = ((MockProcessContext) runner.getProcessContext()).validate();
+		}
+		assertNotNull(results);
+		assertEquals("Expect " + messages.length + " results: " + Arrays.deepToString(messages), messages.length,
+				results.size());
+		results.stream()
+		       .map(ValidationResult::toString)
+		       .forEach(m -> assertThat(m, Matchers.in(messages)));
 	}
 }

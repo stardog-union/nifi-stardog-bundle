@@ -29,7 +29,8 @@ public class StardogControllerServiceTest {
 
         unsetServiceProperties();
         runner.setProperty(service, StardogControllerService.SERVER, "http://localhost:1234/foo");
-        runner.assertNotValid(service);
+        // We won't know until the processor is configured whether krb5 is configured
+        runner.assertValid(service);
 
         unsetServiceProperties();
         runner.setProperty(service, StardogControllerService.USERNAME, "username");
