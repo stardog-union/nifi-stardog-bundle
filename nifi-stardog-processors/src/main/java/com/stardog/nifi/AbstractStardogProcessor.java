@@ -18,7 +18,7 @@ import com.stardog.stark.Values;
 import com.google.api.client.util.Sets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import org.apache.logging.log4j.util.Strings;
+import com.google.common.base.Strings;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
@@ -143,7 +143,7 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 	};
 
 	public static IRI toIRI(String iri, Connection conn, IRI defaultIRI) {
-		return Strings.isEmpty(iri)
+		return Strings.isNullOrEmpty(iri)
 		       ? defaultIRI
 		       : Values.iri(conn.namespaces().map(iri).orElse(iri));
 	}

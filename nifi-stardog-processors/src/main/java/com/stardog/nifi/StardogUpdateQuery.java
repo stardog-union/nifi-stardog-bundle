@@ -119,20 +119,12 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 
 		ComponentLog logger = getLogger();
 
-		try (Connection connection = connect(context)) {
+		try (Connection connection = connect(context, inputFile)) {
 			String queryStr = getQueryString(context, inputFile, connection);
 			long queryTimeout = context.getProperty(QUERY_TIMEOUT).evaluateAttributeExpressions(inputFile).asTimePeriod(TimeUnit.MILLISECONDS);
-			boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
 
 			Query<Void> query = connection.update(queryStr)
-			                              .timeout(queryTimeout)
-			                              .reasoning(isReasoning);
-
-			if (isReasoning) {
-				// Ignore schema if reasoning is off.
-				String schema = getSchema(context, inputFile, isReasoning);
-				query.schema(schema);
-			}
+			                              .timeout(queryTimeout);
 
 			getBindings(context, inputFile, connection).forEach(query::parameter);
 
