@@ -7,7 +7,9 @@ package com.stardog.nifi;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.ConnectionConfiguration;
@@ -18,11 +20,13 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
 import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.util.LogMessage;
 import org.apache.nifi.util.MockProcessContext;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 import org.hamcrest.Matchers;
 import org.junit.Assume;
+import org.slf4j.helpers.MessageFormatter;
 
 import static com.stardog.nifi.AbstractStardogProcessor.SERVER;
 import static com.stardog.nifi.StardogClientService.PASSWORD;
@@ -33,6 +37,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 public abstract class AbstractStardogProcessorTest {
+
+	public final static String NS = "http://example.com/";
 
 	protected static final String NIFI_STARDOG_ENDPOINT_ENV = "NIFI_STARDOG_ENDPOINT";
 
@@ -47,7 +53,7 @@ public abstract class AbstractStardogProcessorTest {
 
 	protected static final String STARDOG_PASSWORD = getEnvWithDefault(NIFI_STARDOG_PASSWORD_ENV, "admin");
 
-	protected abstract Class<? extends AbstractStardogProcessor> getProcessorClass();
+	public static final String DATABASE_VAR_NAME = "stardog.database";
 
 	protected static void assumeStardogAvailable() {
 		Assume.assumeTrue("No Stardog endpoint available. Set " + NIFI_STARDOG_ENDPOINT_ENV +
@@ -71,6 +77,16 @@ public abstract class AbstractStardogProcessorTest {
 
 	protected static String getStardogPassword() {
 		return STARDOG_PASSWORD;
+	}
+
+	private static String getStardogAddressWithPort() {
+		String endpoint = getStardogEndpoint();
+		return endpoint.substring(0, endpoint.lastIndexOf('/') + 1);
+	}
+
+	protected static String getStardogDatabase() {
+		String endpoint = getStardogEndpoint();
+		return endpoint.substring(endpoint.lastIndexOf('/') + 1);
 	}
 
 	protected static void initStardog() {
@@ -98,6 +114,25 @@ public abstract class AbstractStardogProcessorTest {
 		       : value;
 	}
 
+	public static void assertLogMessagesSize(int expectedSize, List<LogMessage> logMessages) {
+		assertEquals("Unexpected List<LogMessage> size:\n" +
+		             logMessages.stream()
+		                        .map(m -> logMessageToString(m))
+		                        .collect(Collectors.joining("\n")),
+				expectedSize,
+				logMessages.size());
+	}
+
+	public static String logMessageToString(LogMessage m) {
+		return MessageFormatter.format(m.getMsg(), m.getArgs()).getMessage();
+	}
+
+	protected static String connectionStringWithDbExpression() {
+		return getStardogAddressWithPort() + "${" + DATABASE_VAR_NAME + "}";
+	}
+
+	protected abstract Class<? extends AbstractStardogProcessor> getProcessorClass();
+
 	protected TestRunner newTestRunner() {
 		TestRunner runner = TestRunners.newTestRunner(getProcessorClass());
 		runner.setProperty(SERVER, getStardogEndpoint());
@@ -116,64 +151,6 @@ public abstract class AbstractStardogProcessorTest {
 		assertEquals(message, results.iterator().next().toString());
 	}
 
-	/**
-	 * Asserts that the iterator for the given iterable returns elements of the given array in some order
-	 */
-	public static <T> void assertEqualsUnordered(final Iterable<T> theActual, final T... theExpected) {
-		assertEqualsUnordered(Arrays.asList(theExpected), theActual);
-	}
-
-	/**
-	 * Asserts that the iterator for the given iterable returns elements of the other iterable in some order
-	 */
-	public static void assertEqualsUnordered(final Iterable<?> theExpected, final Iterable<?> theActual) {
-		assertEqualsUnordered("", theExpected, theActual);
-	}
-
-	/**
-	 * Asserts that the iterator for the given iterable returns elements of the other iterable in some order
-	 */
-	public static void assertEqualsUnordered(String msg, final Iterable<?> theExpected, final Iterable<?> theActual) {
-		Multiset<Object> missing = HashMultiset.create(theExpected);
-		int theExpectedCount = missing.size();
-		int theActualCount = 0;
-		Set<Object> unexpected = Sets.newHashSet();
-		for (Object obj : theActual) {
-			theActualCount++;
-			if (!missing.remove(obj)) {
-				unexpected.add(obj);
-			}
-		}
-		StringBuilder failureMsg = new StringBuilder(msg).append(" ");
-		// Sometimes the actuals are expected but fails because there are duplicates, which was confusing
-		int difference = theActualCount - theExpectedCount;
-		int distinctDifference = unexpected.size() - missing.size();
-		if (difference != 0 && difference != distinctDifference) {
-			failureMsg.append("\n")
-			          .append(Math.abs(difference))
-			          .append(difference > 0 ? " more" : " fewer")
-			          .append(" records than expected.");
-		}
-		if (!unexpected.isEmpty()) {
-			failureMsg.append("\nUnexpected (").append(unexpected.size()).append("):\n");
-			Joiner.on("\n").appendTo(failureMsg, Iterables.limit(unexpected, 10));
-			if (unexpected.size() > 10) {
-				failureMsg.append("\n[").append(unexpected.size() - 10).append(" more]");
-			}
-		}
-		if (!missing.isEmpty()) {
-			failureMsg.append("\nMissing (").append(missing.size()).append("):\n");
-			Joiner.on("\n").appendTo(failureMsg, Iterables.limit(missing, 10));
-			if (missing.size() > 10) {
-				failureMsg.append("\n[").append(missing.size() - 10).append(" more]");
-			}
-		}
-		if (!missing.isEmpty() || !unexpected.isEmpty()) {
-			System.err.println("Contents differ: " + failureMsg);
-			fail(failureMsg.toString());
-		}
-	}
-
 	protected void assertValidationResults(TestRunner runner, String... messages) {
 		Collection<ValidationResult> results = null;
 		if (runner.getProcessContext() instanceof MockProcessContext) {
@@ -185,5 +162,12 @@ public abstract class AbstractStardogProcessorTest {
 		results.stream()
 		       .map(ValidationResult::toString)
 		       .forEach(m -> assertThat(m, Matchers.in(messages)));
+	}
+
+	protected Connection connect() {
+		return ConnectionConfiguration.to(getStardogDatabase())
+		                              .server(getStardogAddressWithPort())
+		                              .credentials(getStardogUsername(), getStardogPassword())
+		                              .connect();
 	}
 }

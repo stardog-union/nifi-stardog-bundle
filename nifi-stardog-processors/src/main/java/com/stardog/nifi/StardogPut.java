@@ -142,6 +142,7 @@ public class StardogPut extends AbstractStardogProcessor {
                     .description("The destination named graph where the data will be loaded into. Data will be loaded into the " +
                                  "DEFAULT graph by default.")
                     .required(false)
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
                     .addValidator(IRI_VALIDATOR)
                     .build();
 
@@ -316,7 +317,7 @@ public class StardogPut extends AbstractStardogProcessor {
 
         ComponentLog logger = getLogger();
 
-        try (Connection connection = connect(context);
+        try (Connection connection = connect(context, inputFile);
              InputStream in = session.read(inputFile)) {
 
             IRI targetGraph =  toIRI(context.getProperty(TARGET_GRAPH).evaluateAttributeExpressions(inputFile).getValue(), connection, Values.DEFAULT_GRAPH);

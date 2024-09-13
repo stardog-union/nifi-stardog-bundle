@@ -20,7 +20,7 @@ public interface StardogClientService extends ControllerService {
 			new PropertyDescriptor.Builder().name("Stardog Connection String")
 			                                .description("Fully qualified Stardog connection string containing " +
 			                                             "the database name, e.g. http://localhost:5820/myDB.")
-			                                .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
+			                                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
 			                                .addValidator(StandardValidators.URL_VALIDATOR);
 
 	PropertyDescriptor USERNAME =

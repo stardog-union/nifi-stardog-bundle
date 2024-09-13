@@ -220,7 +220,7 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 
 		Stopwatch stopwatch = Stopwatch.createStarted();
 
-		FlowFile outputFile = null;
+		FlowFile outputFile;
 
 		ComponentLog logger = getLogger();
 
@@ -256,9 +256,7 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 			Throwable rootCause = Throwables.getRootCause(t);
 			context.yield();
 			logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
-			if (outputFile != null) {
-				session.transfer(outputFile, REL_FAILURE);
-			}
+			session.transfer(inputFile, REL_FAILURE);
 		}
 	}
 

@@ -4,9 +4,10 @@
 
 package com.stardog.nifi;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.function.Supplier;
 
-import com.complexible.common.base.Options;
 import com.complexible.stardog.api.AbstractConnectionConfiguration;
 import com.complexible.stardog.api.ConnectionConfiguration;
 import com.complexible.stardog.api.ConnectionCredentials;
@@ -14,8 +15,9 @@ import com.stardog.nifi.AbstractStardogProcessor.Krb5CredentialsSupplier;
 import com.stardog.nifi.StardogClientService.UsernamePasswordSupplier;
 
 import org.apache.nifi.controller.AbstractControllerService;
+import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.kerberos.KerberosCredentialsService;
-import org.apache.nifi.processor.ProcessContext;
+import org.apache.nifi.processor.Processor;
 import org.apache.nifi.reporting.InitializationException;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
@@ -126,6 +128,39 @@ public class CredentialsValidationTest extends AbstractStardogProcessorTest {
 		assertEquals("testpass", usernamePasswordSupplier.getPassword());
 	}
 
+	/**
+	 * For users that want to run an expression against the server URL, let them get the credentials from the service
+	 * but override the server at the processor level.
+	 */
+	@Test
+	public void clientServiceServerInProcessor() throws InitializationException {
+		TestRunner runner = newTestRunner();
+
+		runner.setProperty(CLIENT_SERVICE, "StardogService");
+		StardogClientService clientService = new StardogControllerService();
+		runner.addControllerService("StardogService", clientService);
+		runner.setProperty(clientService, StardogControllerService.SERVER, "http://localhost:1234/foo");
+		runner.setProperty(clientService, USERNAME, "testuser");
+		runner.setProperty(clientService, PASSWORD, "testpass");
+		runner.enableControllerService(clientService);
+		runner.assertValid();
+
+		assertEquals(getStardogDatabase(), getConnectionConfiguration(runner, null).get(ConnectionConfiguration.DATABASE));
+
+		runner.setProperty(SERVER, "http://localhost:1234/bar");
+		runner.assertValid();
+
+		assertEquals("bar", getConnectionConfiguration(runner, null).get(ConnectionConfiguration.DATABASE));
+
+		runner.setProperty(SERVER, "http://localhost:1234/${db}");
+		runner.assertValid();
+
+		Map<String, String> attributes = Collections.singletonMap("db", "baz");
+		FlowFile inputFile = runner.enqueue("", attributes);
+
+		assertEquals("baz", getConnectionConfiguration(runner, inputFile).get(ConnectionConfiguration.DATABASE));
+	}
+
 	@Test
 	public void clientServiceCredsInProcessor() throws InitializationException {
 		TestRunner runner = newTestRunner();
@@ -195,11 +230,14 @@ public class CredentialsValidationTest extends AbstractStardogProcessorTest {
 	}
 
 	private Supplier<ConnectionCredentials> getConnectionCredentials(TestRunner runner) {
-		ProcessContext context = runner.getProcessContext();
-		StardogPut stardogPut = (StardogPut) runner.getProcessor();
-		ConnectionConfiguration connectionConfiguration = stardogPut.getConnectionConfiguration(context);
-		Options options = connectionConfiguration.getOptions();
-		return options.get(AbstractConnectionConfiguration.CREDENTIALS_SUPPLIER);
+		ConnectionConfiguration connectionConfiguration = getConnectionConfiguration(runner, null);
+		return connectionConfiguration.get(AbstractConnectionConfiguration.CREDENTIALS_SUPPLIER);
+	}
+
+	private ConnectionConfiguration getConnectionConfiguration(TestRunner runner, FlowFile inputFile) {
+		Processor processor = runner.getProcessor();
+		AbstractStardogProcessor stardogProcessor = getProcessorClass().cast(processor);
+		return stardogProcessor.getConnectionConfiguration(runner.getProcessContext(), inputFile);
 	}
 
 	static class MockKerberosCredentialsService extends AbstractControllerService implements KerberosCredentialsService {
