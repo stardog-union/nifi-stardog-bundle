@@ -6,20 +6,27 @@ package com.stardog.nifi;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.io.CharStreams;
+import org.apache.nifi.util.LogMessage;
 import org.apache.nifi.util.MockFlowFile;
 import org.apache.nifi.util.TestRunner;
+import org.hamcrest.MatcherAssert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import static com.stardog.nifi.AbstractStardogProcessor.SERVER;
 import static com.stardog.nifi.AbstractStardogQueryProcessor.REASONING;
 import static com.stardog.nifi.AbstractStardogQueryProcessor.REASONING_SCHEMA;
 import static com.stardog.nifi.StardogReadQuery.OUTPUT_ATTRIBUTE;
 import static com.stardog.nifi.StardogReadQuery.OUTPUT_FORMAT;
 import static com.stardog.nifi.StardogReadQuery.QUERY;
 import static com.stardog.nifi.StardogReadQuery.QUERY_NAME;
+import static com.stardog.nifi.StardogTestUtils.assertEqualsUnordered;
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -165,5 +172,100 @@ public class StardogReadQueryTest extends AbstractStardogQueryTest {
 		assertQuerySuccess(runner, null)
 				.assertAttributeEquals(StardogReadQuery.RESULT_COUNT, "4");
 
+	}
+
+	@Test
+	public void testReasoningSchemaConnectionUrlViaFlowFile() {
+		TestRunner runner = newTestRunner();
+		runner.setProperty(QUERY, "SELECT * { ?s <urn:p> ?o }");
+		runner.setProperty(REASONING, "true");
+		runner.setProperty(OUTPUT_ATTRIBUTE, StardogReadQuery.RESULT_COUNT);
+
+		// Set the connection string to one that requires a var for the schema validation to work
+		runner.setProperty(SERVER, connectionStringWithDbExpression());
+
+		Map<String, String> attributes = Collections.singletonMap(DATABASE_VAR_NAME, getStardogDatabase());
+		runner.enqueue("", attributes);
+
+		runner.setProperty(REASONING_SCHEMA, "g1");
+
+		runner.run();
+
+		// g1 schema contains only one subproperty so we expect only one inferred result
+		assertQuerySuccess(runner, null)
+				.assertAttributeEquals(StardogReadQuery.RESULT_COUNT, "4");
+
+		// Should have no errors and one debug for inability to validate schema given connection requires flowfile
+		assertLogMessagesSize(1, runner.getLogger().getDebugMessages());
+		assertLogMessagesSize(0, runner.getLogger().getErrorMessages());
+
+
+		runner.clearTransferState();
+		runner.setProperty(REASONING_SCHEMA, "bogus");
+		runner.enqueue("", attributes);
+		runner.run();
+
+		// Should have an error for the invalid schema
+		List<LogMessage> errorMessages = runner.getLogger().getErrorMessages();
+		assertLogMessagesSize(1, errorMessages);
+		MatcherAssert.assertThat(logMessageToString(errorMessages.get(0)), containsString("bogus"));
+
+		List<MockFlowFile> files = runner.getFlowFilesForRelationship(AbstractStardogProcessor.REL_SUCCESS);
+		assertNotNull(files);
+		assertEquals("No files should be transferred to success", 0, files.size());
+
+		files = runner.getFlowFilesForRelationship(AbstractStardogProcessor.REL_FAILURE);
+		assertNotNull(files);
+		assertEquals("One file should be transferred to failure", 1, files.size());
+	}
+
+	@Test
+	public void testSchemaValidationConstantConnectionUrl() {
+		TestRunner runner = newTestRunner();
+		runner.setProperty(QUERY, "SELECT * { ?s <urn:p> ?o }");
+		runner.setProperty(REASONING, "true");
+
+		runner.setProperty(REASONING_SCHEMA, "g1");
+		runner.assertValid();
+		assertLogMessagesSize(0, runner.getLogger().getDebugMessages());
+
+		runner.setProperty(REASONING_SCHEMA, "bogus");
+		runner.assertNotValid();
+		assertLogMessagesSize(0, runner.getLogger().getDebugMessages());
+	}
+
+	@Test
+	public void testSchemaValidationUnsetVarInConnectionUrl() {
+		TestRunner runner = newTestRunner();
+		runner.setProperty(QUERY, "SELECT * { ?s <urn:p> ?o }");
+		runner.setProperty(REASONING, "true");
+
+		// Set the connection string to one that requires a var for the schema validation to work
+		runner.setProperty(SERVER, connectionStringWithDbExpression());
+
+		runner.setProperty(REASONING_SCHEMA, "g1");
+		runner.assertValid();
+		assertLogMessagesSize(1, runner.getLogger().getDebugMessages());
+	}
+
+	@Test
+	public void testSchemaValidationConnectionUrlWithVar() {
+		TestRunner runner = newTestRunner();
+		runner.setProperty(QUERY, "SELECT * { ?s <urn:p> ?o }");
+		runner.setProperty(REASONING, "true");
+
+		// Set the connection string to one that requires a var for the schema validation to work
+		runner.setProperty(SERVER, connectionStringWithDbExpression());
+
+		// Set the DB var via variable
+		runner.setVariable(DATABASE_VAR_NAME, getStardogDatabase());
+
+		runner.setProperty(REASONING_SCHEMA, "g1");
+		runner.assertValid();
+		assertLogMessagesSize(0, runner.getLogger().getDebugMessages());
+
+		runner.setProperty(REASONING_SCHEMA, "bogus");
+		runner.assertNotValid();
+		assertLogMessagesSize(0, runner.getLogger().getDebugMessages());
 	}
 }

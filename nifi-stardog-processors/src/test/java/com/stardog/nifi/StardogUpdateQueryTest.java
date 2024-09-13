@@ -4,16 +4,33 @@
 
 package com.stardog.nifi;
 
+import java.util.Collections;
+import java.util.Map;
+
+import com.complexible.stardog.api.Connection;
+import com.stardog.stark.Values;
+
 import org.apache.nifi.util.TestRunner;
+import org.junit.Before;
 import org.junit.Test;
 
+import static com.stardog.nifi.StardogTestUtils.assertQueryResult;
 import static com.stardog.nifi.StardogUpdateQuery.QUERY;
 import static com.stardog.nifi.StardogUpdateQuery.QUERY_NAME;
 
 public class StardogUpdateQueryTest extends AbstractStardogQueryTest {
 
+	public static final String API = "http://api.stardog.com/";
+
 	public StardogUpdateQueryTest() {
 		super(QUERY_NAME, QUERY);
+	}
+
+	@Before
+	public void clearAll() {
+		try (Connection connection = connect()) {
+			connection.update("clear all").execute();
+		}
 	}
 
 	@Override
@@ -57,5 +74,51 @@ public class StardogUpdateQueryTest extends AbstractStardogQueryTest {
 
 		runner.setProperty(QUERY, "CLEAR ALL");
 		runner.assertValid();
+	}
+
+	@Test
+	public void testRunUpdate() {
+		TestRunner runner = newTestRunner();
+		runner.enqueue("");
+
+		runUpdateTest(runner);
+	}
+
+	@Test
+	public void testSetServerViaVariable() {
+		TestRunner runner = newTestRunner();
+
+		runner.setVariable(DATABASE_VAR_NAME, getStardogDatabase());
+		runner.enqueue("");
+
+		runUpdateTest(runner);
+	}
+
+	@Test
+	public void testSetServerViaAttribute() {
+		TestRunner runner = newTestRunner();
+
+		Map<String, String> attributes = Collections.singletonMap(DATABASE_VAR_NAME, getStardogDatabase());
+		runner.enqueue("", attributes);
+
+		runUpdateTest(runner);
+	}
+
+	private void runUpdateTest(TestRunner runner) {
+		runner.setProperty(QUERY, getValidQuery());
+		runner.assertValid();
+
+		runner.run();
+
+		assertLogMessagesSize(0, runner.getLogger().getErrorMessages());
+
+		runner.assertTransferCount(AbstractStardogProcessor.REL_SUCCESS, 1);
+
+		try (Connection connection = connect()) {
+			assertQueryResult(connection.select("select * { ?s ?p ?o }"),
+					Values.iri(API, "I"),
+					Values.iri(API, "am"),
+					Values.iri(API, "U"));
+		}
 	}
 }

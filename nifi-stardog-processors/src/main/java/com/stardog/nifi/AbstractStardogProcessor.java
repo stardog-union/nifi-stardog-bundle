@@ -13,6 +13,7 @@ import java.util.function.Supplier;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.ConnectionConfiguration;
 import com.complexible.stardog.api.ConnectionCredentials;
+import com.complexible.stardog.api.LoginConnectionConfiguration;
 import com.complexible.stardog.metadata.MetaProperties;
 import com.complexible.stardog.reasoning.ReasoningOptions;
 import com.stardog.stark.IRI;
@@ -35,10 +36,10 @@ import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
 
-import static com.stardog.nifi.StardogClientService.*;
 import static com.stardog.nifi.StardogClientService.PASSWORD;
 import static com.stardog.nifi.StardogClientService.SERVER_DESCRIPTOR_BUILDER;
 import static com.stardog.nifi.StardogClientService.USERNAME;
+import static com.stardog.nifi.StardogClientService.UsernamePasswordSupplier;
 
 /**
  * AbstractStardogProcessor is a base class that contains utility functions for Stardog processors like
@@ -110,13 +111,13 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 
 	public static final Set<Relationship> DEFAULT_RELATIONSHIPS = ImmutableSet.of(REL_SUCCESS, REL_FAILURE, REL_RETRY);
 
-	protected ConnectionConfiguration getConnectionConfiguration(PropertyContext context) {
+	protected ConnectionConfiguration getConnectionConfiguration(PropertyContext context, FlowFile inputFile) {
 		ConnectionConfiguration configuration;
 		StardogClientService stardogClientService = context.getProperty(CLIENT_SERVICE)
 		                                                   .asControllerService(StardogClientService.class);
 
+		String connectionURL = context.getProperty(SERVER).evaluateAttributeExpressions(inputFile).getValue();
 		if (stardogClientService == null) {
-			String connectionURL = context.getProperty(SERVER).evaluateAttributeExpressions().getValue();
 			String username = context.getProperty(USERNAME).evaluateAttributeExpressions().getValue();
 			String password = context.getProperty(PASSWORD).evaluateAttributeExpressions().getValue();
 			configuration = ConnectionConfiguration
@@ -125,6 +126,13 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 		}
 		else {
 			configuration = stardogClientService.getConnectionConfiguration();
+
+			// We let the user override the url in the processor so that expressions can be applied
+			if (connectionURL != null) {
+				ConnectionConfiguration override = ConnectionConfiguration.from(connectionURL);
+				configuration.server(override.get(LoginConnectionConfiguration.SERVER))
+				             .database(override.get(ConnectionConfiguration.DATABASE));
+			}
 		}
 
 		KerberosCredentialsService krb5CredentialsService = context.getProperty(KERBEROS_CREDENTIALS_SERVICE)
@@ -137,8 +145,8 @@ public abstract class AbstractStardogProcessor extends AbstractProcessor {
 		return configuration;
 	}
 
-	protected Connection connect(PropertyContext context) {
-		return getConnectionConfiguration(context).connect();
+	protected Connection connect(PropertyContext context, FlowFile inputFile) {
+		return getConnectionConfiguration(context, inputFile).connect();
 	}
 
 	/**

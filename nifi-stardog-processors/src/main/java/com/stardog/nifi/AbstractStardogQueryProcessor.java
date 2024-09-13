@@ -180,7 +180,8 @@ public abstract class AbstractStardogQueryProcessor extends AbstractStardogProce
 		PropertyValue schema = context.getProperty(REASONING_SCHEMA);
 		if (schema.isSet() && !schema.getValue().contains("$")) {
 			try (Connection connection = connect(context)) {
-				SchemaManager schemaManager = connection.as(ReasoningConnection.class).getSchemaManager();
+				ReasoningConnection reasoningConnection = connection.as(ReasoningConnection.class);
+				SchemaManager schemaManager = reasoningConnection.getSchemaManager();
 				Set<String> schemas = schemaManager.getSchemas();
 				if (!schemas.contains(schema.getValue())) {
 					String msg = String.format("Unrecognized schema: '%s'. Valid values: %s", schema, schemas);
@@ -191,7 +192,7 @@ public abstract class AbstractStardogQueryProcessor extends AbstractStardogProce
 				}
 			}
 			catch (RuntimeException e) {
-				getLogger().debug("Error validating schema: ", e);
+				getLogger().debug("Error validating schema", e);
 			}
 		}
 	}
@@ -201,7 +202,7 @@ public abstract class AbstractStardogQueryProcessor extends AbstractStardogProce
 	}
 
 	protected Connection connect(PropertyContext context, FlowFile inputFile) {
-		ConnectionConfiguration configuration = getConnectionConfiguration(context);
+		ConnectionConfiguration configuration = getConnectionConfiguration(context, inputFile);
 
 		PropertyValue reasoningValue = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile);
 		configuration.reasoning(reasoningValue.asBoolean());
