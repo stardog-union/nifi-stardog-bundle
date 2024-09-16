@@ -1,7 +1,3 @@
-// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
-// For more information about licensing and copyright of this software, please contact
-// sales@stardog.com or visit http://stardog.com
-
 package com.stardog.nifi;
 
 import java.io.IOException;
@@ -195,7 +191,7 @@ public class StardogReadQueryTest extends AbstractStardogQueryTest {
 		assertQuerySuccess(runner, null)
 				.assertAttributeEquals(StardogReadQuery.RESULT_COUNT, "4");
 
-		// Should have no errors and one debug for inability to validate schema given connection requires flowfile
+		// Should have no errors and one debug for inability to validate schema given connection requires flowFile
 		assertLogMessagesSize(1, runner.getLogger().getDebugMessages());
 		assertLogMessagesSize(0, runner.getLogger().getErrorMessages());
 

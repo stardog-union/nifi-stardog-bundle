@@ -1,7 +1,3 @@
-// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
-// For more information about licensing and copyright of this software, please contact
-// sales@stardog.com or visit http://stardog.com
-
 package com.stardog.nifi;
 
 import java.util.List;
@@ -130,7 +126,7 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 
 			query.execute();
 
-			logger.info("Update completed; transferring {} to 'success'", new Object[] { inputFile });
+			logger.info("Update completed; transferring {} to 'success'", inputFile);
 			session.getProvenanceReporter()
 			       .modifyContent(inputFile, "Executed update query", stopwatch.elapsed(TimeUnit.MILLISECONDS));
 			session.transfer(inputFile, REL_SUCCESS);
@@ -138,7 +134,7 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 		catch (Throwable t) {
 			Throwable rootCause = Throwables.getRootCause(t);
 			context.yield();
-			logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
+			logger.error("{} failed! Throwable exception {}; rolling back session", this, rootCause);
 			session.transfer(inputFile, REL_FAILURE);
 		}
 	}

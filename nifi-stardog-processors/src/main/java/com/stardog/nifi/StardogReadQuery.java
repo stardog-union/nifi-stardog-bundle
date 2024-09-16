@@ -1,7 +1,3 @@
-// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
-// For more information about licensing and copyright of this software, please contact
-// sales@stardog.com or visit http://stardog.com
-
 package com.stardog.nifi;
 
 import java.io.IOException;
@@ -234,28 +230,28 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 			String outputAttribute = context.getProperty(OUTPUT_ATTRIBUTE).getValue();
 			boolean isByteCount = outputAttribute.equals(BYTE_COUNT);
 
-			MutableLong outpuAttributeValue = new MutableLong(0L);
+			MutableLong outputAttributeValue = new MutableLong(0L);
 
 			ReadQuery<?> query = (ReadQuery<?>) createQuery(connection, queryStr, queryType)
 					.timeout(queryTimeout);
 
 			getBindings(context, inputFile, connection).forEach(query::parameter);
 
-			outputFile = session.write(inputFile, stream -> outpuAttributeValue.setValue(executeQuery(query, stream, outputFormat, isByteCount)));
+			outputFile = session.write(inputFile, stream -> outputAttributeValue.setValue(executeQuery(query, stream, outputFormat, isByteCount)));
 
-			outputFile = session.putAttribute(outputFile, outputAttribute, outpuAttributeValue.toString());
+			outputFile = session.putAttribute(outputFile, outputAttribute, outputAttributeValue.toString());
 
 			outputFile = session.putAttribute(outputFile, CoreAttributes.MIME_TYPE.key(), outputFormat.defaultMimeType());
 
-			logger.info("{} contains {} results; transferring to 'success'", new Object[] { outputFile, outpuAttributeValue });
+			logger.info("{} contains {} results; transferring to 'success'", outputFile, outputAttributeValue);
 			session.getProvenanceReporter()
-			       .modifyContent(outputFile, "Retrieved " + outpuAttributeValue + " results", stopwatch.elapsed(TimeUnit.MILLISECONDS));
+			       .modifyContent(outputFile, "Retrieved " + outputAttributeValue + " results", stopwatch.elapsed(TimeUnit.MILLISECONDS));
 			session.transfer(outputFile, REL_SUCCESS);
 		}
 		catch (Throwable t) {
 			Throwable rootCause = Throwables.getRootCause(t);
 			context.yield();
-			logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
+			logger.error("{} failed! Throwable exception {}; rolling back session", this, rootCause);
 			session.transfer(inputFile, REL_FAILURE);
 		}
 	}

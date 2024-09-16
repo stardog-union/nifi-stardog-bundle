@@ -1,14 +1,9 @@
-// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
-// For more information about licensing and copyright of this software, please contact
-// sales@stardog.com or visit http://stardog.com
-
 package com.stardog.nifi;
 
 import java.util.Map;
 import java.util.Set;
 
 import com.complexible.common.rdf.rio.TurtleValueParser;
-import com.complexible.stardog.Schemas;
 import com.complexible.stardog.StardogException;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.ConnectionConfiguration;
@@ -77,7 +72,7 @@ public abstract class AbstractStardogQueryProcessor extends AbstractStardogProce
 	@Override
 	protected PropertyDescriptor getSupportedDynamicPropertyDescriptor(String propertyDescriptorName) {
 		if (propertyDescriptorName != null &&
-		    propertyDescriptorName.length() > 0 &&
+		    !propertyDescriptorName.isEmpty() &&
 		    // Close enough to a legit var name? Allows num, alpha, and _
 		    propertyDescriptorName.matches("[\\w]+")) {
 
@@ -165,15 +160,6 @@ public abstract class AbstractStardogQueryProcessor extends AbstractStardogProce
 			getLogger().info("Could not retrieve namespaces from database, proceeding without them.");
 		}
 		return aNamespaces;
-	}
-
-	protected String getSchema(ProcessContext context, FlowFile inputFile, boolean isReasoning) {
-		PropertyValue schemaValue = context.getProperty(REASONING_SCHEMA).evaluateAttributeExpressions(inputFile);
-		return schemaValue.isSet()
-		       ? schemaValue.getValue()
-		       : isReasoning
-		         ? Schemas.DEFAULT
-		         : Schemas.NULL;
 	}
 
 	protected void validateSchema(ValidationContext context, Set<ValidationResult> results) {
