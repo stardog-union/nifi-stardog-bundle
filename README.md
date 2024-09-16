@@ -23,8 +23,6 @@ Restart NiFi for changes to take effect.
 
 ## Releasing
 
-> This is the temporary release process until we set up a CI/CD system.
-
 When releasing version `$VERSION`, follow these steps:
 
 1. Checkout the master branch: `git checkout master`

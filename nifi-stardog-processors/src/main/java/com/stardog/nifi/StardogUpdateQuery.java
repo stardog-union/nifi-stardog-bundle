@@ -115,26 +115,18 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 
 		ComponentLog logger = getLogger();
 
-		try (Connection connection = connect(context)) {
+		try (Connection connection = connect(context, inputFile)) {
 			String queryStr = getQueryString(context, inputFile, connection);
 			long queryTimeout = context.getProperty(QUERY_TIMEOUT).evaluateAttributeExpressions(inputFile).asTimePeriod(TimeUnit.MILLISECONDS);
-			boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
 
 			Query<Void> query = connection.update(queryStr)
-			                              .timeout(queryTimeout)
-			                              .reasoning(isReasoning);
-
-			if (isReasoning) {
-				// Ignore schema if reasoning is off.
-				String schema = getSchema(context, inputFile, isReasoning);
-				query.schema(schema);
-			}
+			                              .timeout(queryTimeout);
 
 			getBindings(context, inputFile, connection).forEach(query::parameter);
 
 			query.execute();
 
-			logger.info("Update completed; transferring {} to 'success'", new Object[] { inputFile });
+			logger.info("Update completed; transferring {} to 'success'", inputFile);
 			session.getProvenanceReporter()
 			       .modifyContent(inputFile, "Executed update query", stopwatch.elapsed(TimeUnit.MILLISECONDS));
 			session.transfer(inputFile, REL_SUCCESS);
@@ -142,7 +134,7 @@ public class StardogUpdateQuery extends AbstractStardogQueryProcessor {
 		catch (Throwable t) {
 			Throwable rootCause = Throwables.getRootCause(t);
 			context.yield();
-			logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
+			logger.error("{} failed! Throwable exception {}; rolling back session", this, rootCause);
 			session.transfer(inputFile, REL_FAILURE);
 		}
 	}

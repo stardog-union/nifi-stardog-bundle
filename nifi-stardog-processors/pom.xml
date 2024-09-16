@@ -36,6 +36,11 @@
 			<version>${nifi.version}</version>
 		</dependency>
 		<dependency>
+			<groupId>org.apache.nifi</groupId>
+			<artifactId>nifi-kerberos-credentials-service-api</artifactId>
+			<version>${nifi.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>com.stardog</groupId>
 			<artifactId>nifi-stardog-connection-service-api</artifactId>
 			<version>${project.version}</version>
@@ -53,6 +58,12 @@
 			<artifactId>nifi-mock</artifactId>
 			<version>${nifi.version}</version>
 			<scope>test</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>net.minidev</groupId>
+					<artifactId>json-smart</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
@@ -62,6 +73,12 @@
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.hamcrest</groupId>
+			<artifactId>java-hamcrest</artifactId>
+			<version>2.0.0.0</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

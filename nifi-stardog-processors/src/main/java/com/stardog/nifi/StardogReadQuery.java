@@ -1,5 +1,7 @@
 package com.stardog.nifi;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.EnumMap;
 import java.util.List;
@@ -12,7 +14,7 @@ import com.complexible.common.rdf.query.SPARQLUtil;
 import com.complexible.common.rdf.query.SPARQLUtil.QueryType;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.GraphQuery;
-import com.complexible.stardog.api.Query;
+import com.complexible.stardog.api.ReadQuery;
 import com.complexible.stardog.api.SelectQuery;
 import com.stardog.stark.io.FileFormat;
 import com.stardog.stark.io.RDFFormat;
@@ -30,6 +32,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.ByteStreams;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.nifi.annotation.behavior.EventDriven;
 import org.apache.nifi.annotation.behavior.InputRequirement;
@@ -37,6 +40,7 @@ import org.apache.nifi.annotation.behavior.WritesAttribute;
 import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
@@ -55,14 +59,13 @@ import org.apache.nifi.processor.util.StandardValidators;
 @CapabilityDescription("Execute provided SPARQL read query (SELECT, CONSTRUCT, DESCRIBE) over a Stardog database. Streaming is used so arbitrarily " +
                        "large result sets are supported. This processor can be scheduled to run on a timer, or cron expression, using the standard " +
                        "scheduling methods, or it can be triggered by an incoming FlowFile.  If it is triggered by an incoming FlowFile, then " +
-                       "attributes of that FlowFile will be available when evaluating the query but the contents of that file will not be used. " +
-                       "FlowFile attribute 'result.count' indicates how  many results are returned. This is the number of rows for SELECT queries " +
-                       "and number of triples for CONSTRUCT or DESCRIBE queries.")
+                       "attributes of that FlowFile will be available when evaluating the query but the contents of that file will not be used.")
 @EventDriven
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
 @WritesAttributes({ @WritesAttribute(attribute = "result.count", description = "The number of rows returned by the select query") })
 public class StardogReadQuery extends AbstractStardogQueryProcessor {
 
+	public static final String BYTE_COUNT = "byte.count";
 	public static final String RESULT_COUNT = "result.count";
 
 	public static final String DEFAULT_FORMAT = "CSV";
@@ -123,6 +126,21 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 					.defaultValue(DEFAULT_FORMAT)
 					.build();
 
+	public static final PropertyDescriptor OUTPUT_ATTRIBUTE =
+			new PropertyDescriptor.Builder()
+					.name("Output Attribute")
+					.description("Select the type of the output attribute. The output attribute will either be the number " +
+					             "of bytes in the serialization of query results or the number of results returned by the " +
+					             "query (slow). The number of results correspond to the number of rows for SELECT queries " +
+					             "and number of triples for CONSTRUCT or DESCRIBE queries. Returning the number of results " +
+					             "instead of bytes requires additional processing and can slow down generating large results."
+					)
+					.required(false)
+					.allowableValues(new AllowableValue(BYTE_COUNT, "Byte count (FASTER)"),
+							new AllowableValue(RESULT_COUNT,  "Result count (SLOWER)"))
+					.defaultValue(BYTE_COUNT)
+					.build();
+
 	private static final List<PropertyDescriptor> PROPERTIES =
 			ImmutableList.<PropertyDescriptor>builder()
 					.addAll(DEFAULT_PROPERTIES)
@@ -130,6 +148,7 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 					.add(QUERY)
 					.add(QUERY_TIMEOUT)
 					.add(OUTPUT_FORMAT)
+					.add(OUTPUT_ATTRIBUTE)
 					.add(REASONING)
 					.add(REASONING_SCHEMA)
 					.build();
@@ -197,56 +216,47 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 
 		Stopwatch stopwatch = Stopwatch.createStarted();
 
-		FlowFile outputFile = null;
+		FlowFile outputFile;
 
 		ComponentLog logger = getLogger();
 
-		try (Connection connection = connect(context)) {
+		try (Connection connection = connect(context, inputFile)) {
 			long queryTimeout = context.getProperty(QUERY_TIMEOUT).evaluateAttributeExpressions(inputFile).asTimePeriod(TimeUnit.MILLISECONDS);
 			String queryStr = getQueryString(context, inputFile, connection);
 			QueryType queryType = SPARQLUtil.getType(queryStr);
 			String selectedFormat = context.getProperty(OUTPUT_FORMAT).getValue();
 			Map<QueryType, FileFormat> outputFormats = OUTPUT_FORMATS.get(selectedFormat);
 			FileFormat outputFormat = outputFormats.get(queryType);
-			boolean isReasoning = context.getProperty(REASONING).evaluateAttributeExpressions(inputFile).asBoolean();
+			String outputAttribute = context.getProperty(OUTPUT_ATTRIBUTE).getValue();
+			boolean isByteCount = outputAttribute.equals(BYTE_COUNT);
 
-			MutableLong resultCount = new MutableLong(0L);
+			MutableLong outputAttributeValue = new MutableLong(0L);
 
-			Query<?> query = createQuery(connection, queryStr, queryType)
-					                 .timeout(queryTimeout)
-					                 .reasoning(isReasoning);
-
-			if (isReasoning) {
-				// Ignore schema if reasoning is off.
-				String schema = getSchema(context, inputFile, isReasoning);
-				query.schema(schema);
-			}
+			ReadQuery<?> query = (ReadQuery<?>) createQuery(connection, queryStr, queryType)
+					.timeout(queryTimeout);
 
 			getBindings(context, inputFile, connection).forEach(query::parameter);
 
-			outputFile = session.write(inputFile, stream -> resultCount.setValue(executeQuery(query, stream, outputFormat)));
+			outputFile = session.write(inputFile, stream -> outputAttributeValue.setValue(executeQuery(query, stream, outputFormat, isByteCount)));
 
-			outputFile = session.putAttribute(outputFile, RESULT_COUNT, resultCount.toString());
+			outputFile = session.putAttribute(outputFile, outputAttribute, outputAttributeValue.toString());
 
 			outputFile = session.putAttribute(outputFile, CoreAttributes.MIME_TYPE.key(), outputFormat.defaultMimeType());
 
-			logger.info("{} contains {} results; transferring to 'success'", new Object[] { outputFile, resultCount });
+			logger.info("{} contains {} results; transferring to 'success'", outputFile, outputAttributeValue);
 			session.getProvenanceReporter()
-			       .modifyContent(outputFile, "Retrieved " + resultCount + " results", stopwatch.elapsed(TimeUnit.MILLISECONDS));
+			       .modifyContent(outputFile, "Retrieved " + outputAttributeValue + " results", stopwatch.elapsed(TimeUnit.MILLISECONDS));
 			session.transfer(outputFile, REL_SUCCESS);
 		}
 		catch (Throwable t) {
 			Throwable rootCause = Throwables.getRootCause(t);
 			context.yield();
-			logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
-			if (outputFile != null) {
-				session.transfer(outputFile, REL_FAILURE);
-			}
+			logger.error("{} failed! Throwable exception {}; rolling back session", this, rootCause);
+			session.transfer(inputFile, REL_FAILURE);
 		}
 	}
 
-	private Query<?> createQuery(Connection connection, String queryStr, QueryType queryType) {
-		// TODO support stored queries
+	private ReadQuery<?> createQuery(Connection connection, String queryStr, QueryType queryType) {
 		switch (queryType) {
 			case SELECT:
 				return connection.select(queryStr);
@@ -257,8 +267,13 @@ public class StardogReadQuery extends AbstractStardogQueryProcessor {
 		}
 	}
 
-	private long executeQuery(Query<?> query, OutputStream out, FileFormat outputFormat) {
-		if (query instanceof SelectQuery) {
+	private long executeQuery(ReadQuery<?> query, OutputStream out, FileFormat outputFormat, final boolean isByteCount) throws IOException {
+		if (isByteCount) {
+			try (InputStream in = query.execute(outputFormat)) {
+				return ByteStreams.copy(in, out);
+			}
+		}
+		else if (query instanceof SelectQuery) {
 			return executeSelectQuery((SelectQuery) query, out, (QueryResultFormat) outputFormat);
 		}
 		else {

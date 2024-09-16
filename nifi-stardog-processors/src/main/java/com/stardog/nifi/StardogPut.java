@@ -1,8 +1,11 @@
 package com.stardog.nifi;
 
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -12,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.complexible.common.io.Files2;
 import com.complexible.stardog.api.Connection;
+import com.complexible.stardog.api.IO;
+import com.complexible.stardog.virtual.api.DataSourceOptions;
 import com.complexible.stardog.virtual.api.VirtualGraphOptions;
 import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection;
 import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection.InputFileType;
@@ -28,6 +33,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.ByteStreams;
 import org.apache.nifi.annotation.behavior.EventDriven;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
@@ -94,24 +100,12 @@ public class StardogPut extends AbstractStardogProcessor {
                     .name("Properties File")
                     .description("A Java-style Properties file to be used when loading CSV data into Stardog. The " +
                                  "property keys are identical to those used by the virtual import admin CLI. " +
-                                 "Properties that are set in this file will supercede the individual processor " +
+                                 "Properties that are set in this file will supersede the individual processor " +
                                  "property values.")
                     .required(false)
                     .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
                     .addValidator(StandardValidators.FILE_EXISTS_VALIDATOR)
                     .build();
-
-    // TODO allow R2RML syntax
-//    public static final PropertyDescriptor MAPPING_SYNTAX =
-//            new PropertyDescriptor.Builder()
-//                    .name("Mappings Syntax")
-//                    .description("The syntax used for the mapping file.")
-//                    .required(false)
-//                    .defaultValue(VirtualGraphMappingSyntax.MAPPING_SYNTAX_DEFAULT)
-//                    .allowableValues(VirtualGraphMappingSyntax.MAPPING_SYNTAX_DEFAULT,
-//                                     VirtualGraphMappingSyntax.SMS2.name(),
-//                                     VirtualGraphMappingSyntax.R2RML.name())
-//                    .build();
 
     public static final PropertyDescriptor INPUT_FORMAT =
             new PropertyDescriptor.Builder()
@@ -132,6 +126,7 @@ public class StardogPut extends AbstractStardogProcessor {
                     .description("The destination named graph where the data will be loaded into. Data will be loaded into the " +
                                  "DEFAULT graph by default.")
                     .required(false)
+                    .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
                     .addValidator(IRI_VALIDATOR)
                     .build();
 
@@ -306,7 +301,7 @@ public class StardogPut extends AbstractStardogProcessor {
 
         ComponentLog logger = getLogger();
 
-        try (Connection connection = connect(context);
+        try (Connection connection = connect(context, inputFile);
              InputStream in = session.read(inputFile)) {
 
             IRI targetGraph =  toIRI(context.getProperty(TARGET_GRAPH).evaluateAttributeExpressions(inputFile).getValue(), connection, Values.DEFAULT_GRAPH);
@@ -341,7 +336,7 @@ public class StardogPut extends AbstractStardogProcessor {
                 }
             }
 
-            logger.info("Input format for ingestion {} ({})", new Object[] { inputFormat, inputFormat.getClass().getSimpleName() });
+            logger.info("Input format for ingestion {} ({})", inputFormat, inputFormat.getClass().getSimpleName());
 
             if (inputFormat instanceof QueryResultFormat) {
                 VirtualGraphAdminConnection vgConn = connection.admin().as(VirtualGraphAdminConnection.class);
@@ -353,8 +348,14 @@ public class StardogPut extends AbstractStardogProcessor {
 
                 if (clearTargetGraph) {
                     connection.begin();
-                    connection.remove().context(targetGraph);
-                    connection.commit();
+                    try {
+                        connection.remove().context(targetGraph);
+                        connection.commit();
+                    }
+                    catch (Throwable t) {
+                        connection.rollback();
+                        throw t;
+                    }
                 }
 
                 InputFileType fileType = inputFormat.equals(QueryResultFormats.JSON)
@@ -370,13 +371,13 @@ public class StardogPut extends AbstractStardogProcessor {
                                       .setProperty(CSV_SKIP_EMPTY, VirtualGraphOptions.CSV_SKIP_EMPTY)
                                       .setProperty(BASE_URI, VirtualGraphOptions.BASE_URI)
                                       .setProperty(CSV_CLASS, VirtualGraphOptions.CSV_CLASS)
-                                      .setProperty(UNIQUE_KEY_SETS, VirtualGraphOptions.UNIQUE_KEY_SETS)
+                                      .setProperty(UNIQUE_KEY_SETS, DataSourceOptions.UNIQUE_KEY_SETS)
                                       .build();
 
                 PropertyValue propertiesPath = context.getProperty(PROPERTIES_FILE).evaluateAttributeExpressions(inputFile);
                 if (propertiesPath.isSet()) {
                     Properties propsFromFile = new Properties();
-                    try (FileInputStream is = new FileInputStream(propertiesPath.getValue())) {
+                    try (InputStream is = Files.newInputStream(Paths.get(propertiesPath.getValue()))) {
                         propsFromFile.load(is);
                     }
                     properties.putAll(propsFromFile);
@@ -386,15 +387,27 @@ public class StardogPut extends AbstractStardogProcessor {
             }
             else {
                 connection.begin();
-                if (clearTargetGraph) {
-                    connection.remove().context(targetGraph);
+                try {
+                    if (clearTargetGraph) {
+                        connection.remove().context(targetGraph);
+                    }
+                    IO io = connection.add()
+                                      .io()
+                                      .format((RDFFormat) inputFormat)
+                                      .context(targetGraph);
+                    if (isKerberosCredentials(context)) {
+                        // HACK: Work around MainClientExec.execute requiring restartable entity with krb5 negotiation
+                        ioByTempFile(connection, in, io);
+                    }
+                    else {
+                        io.stream(in);
+                        connection.commit();
+                    }
                 }
-                connection.add()
-                          .io()
-                          .format((RDFFormat) inputFormat)
-                          .context(targetGraph)
-                          .stream(in);
-                connection.commit();
+                catch (Throwable t) {
+                    connection.rollback();
+                    throw t;
+                }
             }
 
             logger.info("Finished ingesting data into Stardog; transferring to 'success'", new Object[] { });
@@ -405,8 +418,28 @@ public class StardogPut extends AbstractStardogProcessor {
         catch (Throwable t) {
             Throwable rootCause = Throwables.getRootCause(t);
             context.yield();
-            logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
+            logger.error("{} failed! Throwable exception {}; rolling back session", this, rootCause);
             session.transfer(inputFile, REL_FAILURE);
+        }
+    }
+
+    private boolean isKerberosCredentials(ProcessContext context) {
+        return context.getProperty(KERBEROS_CREDENTIALS_SERVICE) != null;
+    }
+
+    private void ioByTempFile(Connection connection, InputStream in, IO io) throws IOException {
+        File tempFile = File.createTempFile("StardogPut", "tmp");
+        try (OutputStream os = Files.newOutputStream(tempFile.toPath())) {
+            ByteStreams.copy(in, os);
+            os.close();
+            in.close();
+            io.file(tempFile.toPath());
+            connection.commit();
+        }
+        finally {
+            if (!tempFile.delete()) {
+                tempFile.deleteOnExit();
+            }
         }
     }
 

@@ -1,1 +1,12 @@
-# Pretend like there's some mappings in here
+PREFIX : <http://example.com/>
+
+MAPPING <urn:misc>
+FROM JSON {
+  { "val" : "?val" }
+}
+TO {
+  ?sub a :Widget
+}
+WHERE {
+  BIND(TEMPLATE("http://example.com/{val}") AS ?sub)
+}
