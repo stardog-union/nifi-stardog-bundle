@@ -1,11 +1,6 @@
-// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
-// For more information about licensing and copyright of this software, please contact
-// sales@stardog.com or visit http://stardog.com
-
 package com.stardog.nifi;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -32,6 +27,7 @@ import com.stardog.stark.io.RDFFormat;
 import com.stardog.stark.io.RDFFormats;
 import com.stardog.stark.query.io.QueryResultFormat;
 import com.stardog.stark.query.io.QueryResultFormats;
+
 import com.google.common.base.Charsets;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
@@ -104,24 +100,12 @@ public class StardogPut extends AbstractStardogProcessor {
                     .name("Properties File")
                     .description("A Java-style Properties file to be used when loading CSV data into Stardog. The " +
                                  "property keys are identical to those used by the virtual import admin CLI. " +
-                                 "Properties that are set in this file will supercede the individual processor " +
+                                 "Properties that are set in this file will supersede the individual processor " +
                                  "property values.")
                     .required(false)
                     .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
                     .addValidator(StandardValidators.FILE_EXISTS_VALIDATOR)
                     .build();
-
-    // TODO allow R2RML syntax
-//    public static final PropertyDescriptor MAPPING_SYNTAX =
-//            new PropertyDescriptor.Builder()
-//                    .name("Mappings Syntax")
-//                    .description("The syntax used for the mapping file.")
-//                    .required(false)
-//                    .defaultValue(VirtualGraphMappingSyntax.MAPPING_SYNTAX_DEFAULT)
-//                    .allowableValues(VirtualGraphMappingSyntax.MAPPING_SYNTAX_DEFAULT,
-//                                     VirtualGraphMappingSyntax.SMS2.name(),
-//                                     VirtualGraphMappingSyntax.R2RML.name())
-//                    .build();
 
     public static final PropertyDescriptor INPUT_FORMAT =
             new PropertyDescriptor.Builder()
@@ -352,7 +336,7 @@ public class StardogPut extends AbstractStardogProcessor {
                 }
             }
 
-            logger.info("Input format for ingestion {} ({})", new Object[] { inputFormat, inputFormat.getClass().getSimpleName() });
+            logger.info("Input format for ingestion {} ({})", inputFormat, inputFormat.getClass().getSimpleName());
 
             if (inputFormat instanceof QueryResultFormat) {
                 VirtualGraphAdminConnection vgConn = connection.admin().as(VirtualGraphAdminConnection.class);
@@ -434,7 +418,7 @@ public class StardogPut extends AbstractStardogProcessor {
         catch (Throwable t) {
             Throwable rootCause = Throwables.getRootCause(t);
             context.yield();
-            logger.error("{} failed! Throwable exception {}; rolling back session", new Object[] { this, rootCause });
+            logger.error("{} failed! Throwable exception {}; rolling back session", this, rootCause);
             session.transfer(inputFile, REL_FAILURE);
         }
     }
@@ -445,7 +429,7 @@ public class StardogPut extends AbstractStardogProcessor {
 
     private void ioByTempFile(Connection connection, InputStream in, IO io) throws IOException {
         File tempFile = File.createTempFile("StardogPut", "tmp");
-        try (OutputStream os = new FileOutputStream(tempFile)) {
+        try (OutputStream os = Files.newOutputStream(tempFile.toPath())) {
             ByteStreams.copy(in, os);
             os.close();
             in.close();

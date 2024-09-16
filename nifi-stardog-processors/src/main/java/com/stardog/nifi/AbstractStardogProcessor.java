@@ -1,7 +1,3 @@
-// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
-// For more information about licensing and copyright of this software, please contact
-// sales@stardog.com or visit http://stardog.com
-
 package com.stardog.nifi;
 
 import java.io.File;

@@ -1,24 +1,14 @@
-// Copyright (c) 2010 - 2020, Stardog Union. <http://www.stardog.com>
-// For more information about licensing and copyright of this software, please contact
-// sales@stardog.com or visit http://stardog.com
-
 package com.stardog.nifi;
 
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.ConnectionConfiguration;
 
-import com.google.common.base.Joiner;
-import com.google.common.collect.HashMultiset;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Multiset;
-import com.google.common.collect.Sets;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.util.LogMessage;
 import org.apache.nifi.util.MockProcessContext;
@@ -34,7 +24,6 @@ import static com.stardog.nifi.StardogClientService.USERNAME;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
 
 public abstract class AbstractStardogProcessorTest {
 
@@ -117,7 +106,7 @@ public abstract class AbstractStardogProcessorTest {
 	public static void assertLogMessagesSize(int expectedSize, List<LogMessage> logMessages) {
 		assertEquals("Unexpected List<LogMessage> size:\n" +
 		             logMessages.stream()
-		                        .map(m -> logMessageToString(m))
+		                        .map(AbstractStardogProcessorTest::logMessageToString)
 		                        .collect(Collectors.joining("\n")),
 				expectedSize,
 				logMessages.size());

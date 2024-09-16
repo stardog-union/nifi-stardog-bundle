@@ -28,13 +28,6 @@
 			<version>${stardog.version}</version>
 		</dependency>
 
-		<!-- Temp work-around for 30.1-jre not finding InternalFutureFailureAccess -->
-		<dependency>
-			<groupId>com.google.guava</groupId>
-			<artifactId>guava</artifactId>
-			<version>33.2.1-jre</version>
-		</dependency>
-
 		<!-- This service-api project does not depend on client-http directly. This dependency is here so it is
 		shared by the service and processor projects, loaded by a single class loader. When each project has its
 		own dependency it's possible to have, say, VirtualGraphAdminConnection loaded by one class loader and

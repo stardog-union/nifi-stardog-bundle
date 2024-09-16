@@ -27,6 +27,7 @@ public class StardogTestUtils {
 	/**
 	 * Asserts that the iterator for the given iterable returns elements of the given array in some order
 	 */
+	@SafeVarargs
 	public static <T> void assertEqualsUnordered(final Iterable<T> theActual, final T... theExpected) {
 		assertEqualsUnordered(Arrays.asList(theExpected), theActual);
 	}
@@ -53,7 +54,7 @@ public class StardogTestUtils {
 			}
 		}
 		StringBuilder failureMsg = new StringBuilder(msg).append(" ");
-		// Sometimes the actuals are expected but fails because there are duplicates, which was confusing
+		// Sometimes the actual are expected but fails because there are duplicates, which was confusing
 		int difference = theActualCount - theExpectedCount;
 		int distinctDifference = unexpected.size() - missing.size();
 		if (difference != 0 && difference != distinctDifference) {
