@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import com.complexible.common.io.Files2;
 import com.complexible.stardog.api.Connection;
 import com.complexible.stardog.api.IO;
+import com.complexible.stardog.api.UpdateQuery;
 import com.complexible.stardog.virtual.api.DataSourceOptions;
 import com.complexible.stardog.virtual.api.VirtualGraphOptions;
 import com.complexible.stardog.virtual.api.admin.VirtualGraphAdminConnection;
@@ -142,6 +143,15 @@ public class StardogPut extends AbstractStardogProcessor {
                     .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
                     .build();
 
+    public static final PropertyDescriptor QUERY =
+            new PropertyDescriptor.Builder()
+                .name("Graph Update")
+                .description("Preparatory SPARQL update executed prior to the virtual import")
+                .required(false)
+                .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+                .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+                .build();
+
     public static final PropertyDescriptor CSV_SEPARATOR =
             new PropertyDescriptor.Builder()
                     .name("CSV Separator")
@@ -237,6 +247,7 @@ public class StardogPut extends AbstractStardogProcessor {
                     .add(PROPERTIES_FILE)
                     .add(TARGET_GRAPH)
                     .add(CLEAR_TARGET_GRAPH)
+                    .add(QUERY)
                     .add(CSV_SEPARATOR)
                     .add(CSV_QUOTE)
                     .add(CSV_ESCAPE)
@@ -246,6 +257,14 @@ public class StardogPut extends AbstractStardogProcessor {
                     .add(BASE_URI)
                     .add(UNIQUE_KEY_SETS)
                     .build();
+
+    protected String getQueryString(ProcessContext context, FlowFile inputFile, Connection connection) {
+        // Retrieves the (potentially generated) SPARQL update string
+        String result = null;
+        if (context.getProperty(QUERY).isSet())
+            result = context.getProperty(QUERY).evaluateAttributeExpressions(inputFile).getValue();
+        return result;
+    }
 
     @Override
     protected void init(ProcessorInitializationContext context) {
@@ -302,11 +321,11 @@ public class StardogPut extends AbstractStardogProcessor {
         ComponentLog logger = getLogger();
 
         try (Connection connection = connect(context, inputFile);
-             InputStream in = session.read(inputFile)) {
+            InputStream in = session.read(inputFile)) {
 
             IRI targetGraph =  toIRI(context.getProperty(TARGET_GRAPH).evaluateAttributeExpressions(inputFile).getValue(), connection, Values.DEFAULT_GRAPH);
             boolean clearTargetGraph =  context.getProperty(CLEAR_TARGET_GRAPH).evaluateAttributeExpressions(inputFile).asBoolean();
-
+            String queryStr = getQueryString(context, inputFile, connection);
             String selectedFormat = context.getProperty(INPUT_FORMAT).getValue();
 
             FileFormat inputFormat;
@@ -357,6 +376,11 @@ public class StardogPut extends AbstractStardogProcessor {
                         throw t;
                     }
                 }
+                else if (queryStr != null) {
+                    UpdateQuery updateQuery = connection.update(queryStr);
+                    updateQuery.execute();
+                    logger.info("Update query successfully executed");
+                }
 
                 InputFileType fileType = inputFormat.equals(QueryResultFormats.JSON)
                                          ? InputFileType.JSON
@@ -386,6 +410,11 @@ public class StardogPut extends AbstractStardogProcessor {
                 vgConn.importFile(mappingString, properties, connection.name(), targetGraph, in, fileType);
             }
             else {
+                if (!clearTargetGraph && queryStr != null) {
+                    UpdateQuery updateQuery = connection.update(queryStr);
+                    updateQuery.execute();
+                    logger.info("Update query successfully executed");
+                }
                 connection.begin();
                 try {
                     if (clearTargetGraph) {

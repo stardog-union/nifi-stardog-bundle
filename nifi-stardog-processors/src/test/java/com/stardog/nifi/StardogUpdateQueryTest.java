@@ -36,7 +36,7 @@ public class StardogUpdateQueryTest extends AbstractStardogQueryTest {
 
 	@Override
 	protected String getValidQuery() {
-		return "INSERT DATA { :I :am :U }";
+		return "PREFIX : <http://api.stardog.com/> INSERT DATA { :I :am :U }";
 	}
 
 	@Test
