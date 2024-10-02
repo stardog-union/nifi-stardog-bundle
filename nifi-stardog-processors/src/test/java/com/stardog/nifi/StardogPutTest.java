@@ -104,7 +104,7 @@ public class StardogPutTest extends AbstractStardogProcessorTest {
 		}
 		// Assign a SPARQL update to selectively clear the graph before the ingestion
 		TestRunner runner = newTestRunner();
-		runner.setVariable(DATABASE_VAR_NAME, getStardogDatabase());
+		runner.setEnvironmentVariableValue(DATABASE_VAR_NAME, getStardogDatabase());
 		runner.enqueue("{ \"val\" : \"1\" }");
 		runServerExpressionTest(runner, "prefix : <"+ NS +"> with <tag:g1> delete { ?s a :OldType } where { ?s a :OldType }");
 	}
