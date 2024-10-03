@@ -1,22 +1,23 @@
 package com.stardog.nifi;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
 
 import com.complexible.stardog.api.Connection;
 import com.stardog.stark.Values;
 import com.stardog.stark.vocabs.RDF;
+import com.stardog.stark.io.RDFFormats;
+import com.stardog.stark.Statement;
 
+import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.util.TestRunner;
 import org.junit.Before;
 import org.junit.Test;
 
 import static com.stardog.nifi.AbstractStardogProcessor.SERVER;
-import static com.stardog.nifi.StardogPut.CLEAR_TARGET_GRAPH;
-import static com.stardog.nifi.StardogPut.INPUT_FORMAT;
-import static com.stardog.nifi.StardogPut.MAPPINGS_FILE;
-import static com.stardog.nifi.StardogPut.TARGET_GRAPH;
-import static com.stardog.nifi.StardogPut.UNIQUE_KEY_SETS;
+import static com.stardog.nifi.StardogPut.*;
 import static com.stardog.nifi.StardogTestUtils.assertQueryResult;
 
 public class StardogPutTest extends AbstractStardogProcessorTest {
@@ -83,10 +84,44 @@ public class StardogPutTest extends AbstractStardogProcessorTest {
 		runServerExpressionTest(runner);
 	}
 
+	@Test
+	public void testClearQuery() {
+		// Obsolete statement to be replaced
+		Statement obsolete = Values.statement(Values.iri(NS, "1"),
+				RDF.TYPE,
+				Values.iri(NS, "OldType"),
+				Values.iri("tag:g1"));
+
+		try (Connection connection = connect()) {
+			connection.namespaces().add("",NS);
+			connection.begin();
+			connection.add().statement(obsolete);
+			connection.commit();
+			assertQueryResult(connection.select("select * { graph <tag:g1> { ?s ?p ?o } }"),
+					obsolete.subject(),
+					obsolete.predicate(),
+					obsolete.object());
+		}
+		// Assign a SPARQL update to selectively clear the graph before the ingestion
+		TestRunner runner = newTestRunner();
+		runner.setVariable(DATABASE_VAR_NAME, getStardogDatabase());
+		runner.enqueue("{ \"val\" : \"1\" }");
+		runServerExpressionTest(runner, "prefix : <"+ NS +"> with <tag:g1> delete { ?s a :OldType } where { ?s a :OldType }");
+	}
+
+	private void runServerExpressionTest(TestRunner runner, String query) {
+		if(query == null){
+			runner.setProperty(CLEAR_TARGET_GRAPH, "true");
+		}
+		else{
+			runner.setProperty(QUERY, query);
+		}
+		runServerExpressionTest(runner);
+	}
+
 	private void runServerExpressionTest(TestRunner runner) {
 		runner.setProperty(INPUT_FORMAT, "JSON");
 		runner.setProperty(TARGET_GRAPH, "tag:g1");
-		runner.setProperty(CLEAR_TARGET_GRAPH, "true");
 		runner.setProperty(MAPPINGS_FILE, getTestMappingFile());
 		runner.setProperty(SERVER, connectionStringWithDbExpression());
 

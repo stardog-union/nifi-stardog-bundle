@@ -10,12 +10,14 @@
 
     <groupId>com.stardog</groupId>
     <artifactId>nifi-stardog-bundle</artifactId>
-    <version>2.0.0</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
     <properties>
         <nifi.version>1.21.0</nifi.version>
-        <stardog.version>10.0.0</stardog.version>
+        <stardog.version>10.0.0</stardog.version>        
+        <nifi.groovy.version>2.5.6</nifi.groovy.version><!-- https://stackoverflow.com/a/69388478 -->
+        <revision>2.0.1</revision><!-- clear graph query added in 2.0.1 -->
     </properties>
 
     <modules>
@@ -54,6 +56,7 @@
         <repository>
             <id>stardog-public</id>
             <url>https://maven.stardog.com</url>
-        </repository>
+        </repository>        
     </repositories>
+
 </project>
