@@ -364,7 +364,7 @@ public class StardogPut extends AbstractStardogProcessor {
                 String mappingString = mappingsPath.isSet()
                                        ? Files2.toString(new File(mappingsPath.getValue()).toPath(), Charsets.UTF_8)
                                        : null;
-
+                // Optionally clear target graph
                 if (clearTargetGraph) {
                     connection.begin();
                     try {
@@ -376,7 +376,8 @@ public class StardogPut extends AbstractStardogProcessor {
                         throw t;
                     }
                 }
-                else if (queryStr != null) {
+                // Insert data or selectively clear graph(s)
+                if (queryStr != null) {
                     UpdateQuery updateQuery = connection.update(queryStr);
                     updateQuery.execute();
                     logger.info("Update query successfully executed");
@@ -410,15 +411,15 @@ public class StardogPut extends AbstractStardogProcessor {
                 vgConn.importFile(mappingString, properties, connection.name(), targetGraph, in, fileType);
             }
             else {
-                if (!clearTargetGraph && queryStr != null) {
-                    UpdateQuery updateQuery = connection.update(queryStr);
-                    updateQuery.execute();
-                    logger.info("Update query successfully executed");
-                }
                 connection.begin();
                 try {
                     if (clearTargetGraph) {
                         connection.remove().context(targetGraph);
+                    }
+                    if (queryStr != null) {
+                        UpdateQuery updateQuery = connection.update(queryStr);
+                        updateQuery.execute();
+                        logger.info("Update query successfully executed");
                     }
                     IO io = connection.add()
                                       .io()
